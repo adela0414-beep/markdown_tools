@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markdown 智能分页切图工具</title>
+    <title>交互式原型：Markdown 智能分页切图工具</title>
     
     <!-- Chosen Palette: Warm Neutrals -->
     <!-- Application Structure Plan: 采用经典的双栏布局。左侧为控制面板，包含Markdown编辑器和所有样式自定义选项，使用户可以方便地输入内容并调整外观。右侧为实时预览区域，即时反馈用户的每一次修改，忠实模拟最终的图片分页效果。这种结构将“输入/控制”与“输出/结果”清晰分离，符合创作者工具的直觉，实现了“所见即所得”的核心用户流程：编辑 -> 预览 -> 调整 -> 导出。 -->
@@ -524,11 +524,11 @@ function generatePages(markdown) {
                             // 创建水印元素（如果启用）
                             if (state.showWatermark) {
                                 const watermark = document.createElement('div');
-                                watermark.textContent = '使用「口袋分析师」微信小程序生成  可生成任意公司同款报告';
+                                watermark.textContent = '「口袋分析师」VX小程序生成 任意公司深度分析+护城河透视都可生成';
                                 watermark.style.position = 'absolute';
                                 watermark.style.bottom = '8px';
                                 watermark.style.right = '12px';
-                                watermark.style.fontSize = '11px';
+                                watermark.style.fontSize = '10px';
                                 watermark.style.color = '#28A745';
                                 watermark.style.opacity = '0.9';
                                 watermark.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
