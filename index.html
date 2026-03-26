@@ -630,129 +630,190 @@ function generatePages(markdown) {
                             }
                         }
 
-                        // 按行分页处理文本元素的函数
-                        async function processTextElementByLines(element, elementIndex) {
-                            const textContent = element.textContent?.trim() || '';
-                            if (!textContent) return;
-                            
-                            console.log(`Processing text element by lines: ${element.tagName}`);
-                            
-                            // 创建一个临时元素来测量行高
-                            const tempElement = element.cloneNode(true);
-                            tempElement.style.position = 'absolute';
-                            tempElement.style.visibility = 'hidden';
-                            tempElement.style.width = `${pageContentDiv.offsetWidth}px`;
-                            tempElement.style.height = 'auto';
-                            tempElement.style.whiteSpace = 'normal';
-                            tempElement.style.wordWrap = 'break-word';
-                            document.body.appendChild(tempElement);
-                            
-                            // 获取单行高度
-                            const originalHTML = tempElement.innerHTML;
-                            tempElement.textContent = 'A';
-                            const lineHeight = tempElement.offsetHeight;
-                            tempElement.innerHTML = originalHTML;
-                            const totalHeight = tempElement.offsetHeight;
-                            const totalLines = Math.ceil(totalHeight / lineHeight);
-                            
-                            console.log(`Element has ${totalLines} lines, line height: ${lineHeight}px`);
-                            
-                            // 如果只有一行或者是特殊元素，直接按整个元素处理
-                            if (totalLines <= 1 || element.tagName === 'H1' || element.tagName === 'H2' || 
-                                element.tagName === 'H3' || element.tagName === 'H4' || element.tagName === 'H5' || element.tagName === 'H6') {
-                                document.body.removeChild(tempElement);
-                                return await processElementAsWhole(element, elementIndex);
-                            }
-                            
-                            // 对于包含HTML标记的元素，使用更智能的分割方法
-                            // 检查是否包含HTML标记
-                            const hasHTMLTags = element.innerHTML !== element.textContent;
-                            
-                            if (hasHTMLTags) {
-                                // 如果包含HTML标记，按整个元素处理以保持格式
-                                document.body.removeChild(tempElement);
-                                return await processElementAsWhole(element, elementIndex);
-                            }
-                            
-                            // 分割文本为单词
-                            const words = textContent.split(/\s+/);
-                            let currentText = '';
-                            let currentElement = null;
-                            
-                            for (let i = 0; i < words.length; i++) {
-                                const testText = currentText ? currentText + ' ' + words[i] : words[i];
-                                tempElement.textContent = testText;
-                                
-                                const testHeight = tempElement.offsetHeight;
-                                
-                                // 临时添加到页面测试实际高度
-                                const testElement = element.cloneNode(false);
-                                testElement.textContent = testText;
-                                pageContentDiv.appendChild(testElement);
-                                const wouldExceedHeight = pageContentDiv.scrollHeight > contentHeight + 20;
-                                pageContentDiv.removeChild(testElement);
-                                
-                                // 如果添加这个单词会超出当前页面高度
-                                if (wouldExceedHeight && currentText) {
-                                    // 创建当前行的元素并添加到页面
-                                    if (!currentElement) {
-                                        currentElement = element.cloneNode(false);
-                                    }
-                                    currentElement.textContent = currentText;
-                                    
-                                    // 如果当前页面为空，直接添加
-                                    if (pageContentDiv.children.length === 0) {
-                                        pageContentDiv.appendChild(currentElement);
-                                    } else {
-                                        // 测试是否能放入当前页面
-                                        pageContentDiv.appendChild(currentElement);
-                                        if (pageContentDiv.scrollHeight > contentHeight + 20) {
-                                            pageContentDiv.removeChild(currentElement);
-                                            createNewPage();
-                                            pageContentDiv.appendChild(currentElement);
-                                        }
-                                    }
-                                    
-                                    // 重置当前文本和元素
-                                    currentText = words[i];
-                                    currentElement = null;
-                                } else {
-                                    currentText = testText;
-                                }
-                            }
-                            
-                            // 处理剩余的文本
-                            if (currentText) {
-                                if (!currentElement) {
-                                    currentElement = element.cloneNode(false);
-                                }
-                                currentElement.textContent = currentText;
-                                
-                                if (pageContentDiv.children.length === 0) {
-                                    pageContentDiv.appendChild(currentElement);
-                                } else {
-                                    pageContentDiv.appendChild(currentElement);
-                                    if (pageContentDiv.scrollHeight > contentHeight + 20) {
-                                        pageContentDiv.removeChild(currentElement);
-                                        createNewPage();
-                                        pageContentDiv.appendChild(currentElement);
-                                    }
-                                }
-                            }
-                            
-                            document.body.removeChild(tempElement);
+                        // ===== 智能分割辅助函数 =====
+
+                        // 判断块级元素是否可以被分割
+                        function isBlockSplittable(el) {
+                            return ['P', 'DIV', 'BLOCKQUOTE', 'LI'].includes(el.tagName);
                         }
-                        
-                        // 按整个元素处理的函数（用于表格、图片、链接等不可分割的元素）
-                        async function processElementAsWhole(element, elementIndex) {
-                            // 更宽松的空白元素过滤 - 只过滤真正的空元素
+
+                        // 分割内联元素（<strong>, <em>, <a> 等）的文本内容
+                        // 使用二分查找找到能放入当前页面的最多字符数
+                        function trySplitInlineEl(inlineEl, parentEl, containerDiv, maxScrollH) {
+                            const text = inlineEl.textContent;
+                            if (!text || text.length <= 1) return null;
+
+                            const first = inlineEl.cloneNode(false);
+                            const second = inlineEl.cloneNode(false);
+
+                            parentEl.appendChild(first);
+                            let lo = 0, hi = text.length;
+                            while (lo < hi) {
+                                const mid = Math.ceil((lo + hi) / 2);
+                                first.textContent = text.substring(0, mid);
+                                if (containerDiv.scrollHeight <= maxScrollH) lo = mid;
+                                else hi = mid - 1;
+                            }
+                            parentEl.removeChild(first);
+
+                            if (lo > 0 && lo < text.length) {
+                                first.textContent = text.substring(0, lo);
+                                second.textContent = text.substring(lo);
+                                return { firstPart: first, secondPart: second };
+                            }
+                            return null;
+                        }
+
+                        // 分割块级元素（<p>、<blockquote>、<li> 等）以填满页面剩余空间
+                        // 直接在 pageContentDiv 上测量高度，确保精确
+                        // 返回 { firstPart, secondPart } 或 null（无法有效分割时）
+                        function trySplitBlock(element) {
+                            const maxScrollH = contentHeight + 20;
+                            const firstPart = element.cloneNode(false);
+                            const secondPart = element.cloneNode(false);
+
+                            const source = element.cloneNode(true);
+                            const childNodes = Array.from(source.childNodes);
+
+                            // 将 firstPart 临时添加到页面，以便实际测量高度
+                            pageContentDiv.appendChild(firstPart);
+
+                            let overflowed = false;
+                            let hasFirstContent = false;
+
+                            // 内联元素标签列表（可以尝试字符级分割）
+                            const inlineTags = ['STRONG', 'EM', 'A', 'SPAN', 'CODE', 'B', 'I', 'U', 'S', 'SUB', 'SUP', 'MARK'];
+                            // 可递归分割的块级子元素
+                            const splitableBlockTags = ['P', 'DIV', 'BLOCKQUOTE', 'LI'];
+
+                            for (const node of childNodes) {
+                                if (overflowed) {
+                                    secondPart.appendChild(node);
+                                    continue;
+                                }
+
+                                firstPart.appendChild(node);
+
+                                if (pageContentDiv.scrollHeight > maxScrollH) {
+                                    // 此节点导致溢出 — 取出并尝试分割
+                                    firstPart.removeChild(node);
+
+                                    if (node.nodeType === Node.TEXT_NODE) {
+                                        // 文本节点：字符级二分查找（对中文天然友好）
+                                        const txt = node.textContent;
+                                        let lo = 0, hi = txt.length;
+                                        while (lo < hi) {
+                                            const mid = Math.ceil((lo + hi) / 2);
+                                            const tn = document.createTextNode(txt.substring(0, mid));
+                                            firstPart.appendChild(tn);
+                                            if (pageContentDiv.scrollHeight <= maxScrollH) lo = mid;
+                                            else hi = mid - 1;
+                                            firstPart.removeChild(tn);
+                                        }
+                                        if (lo > 0) {
+                                            firstPart.appendChild(document.createTextNode(txt.substring(0, lo)));
+                                            secondPart.appendChild(document.createTextNode(txt.substring(lo)));
+                                            hasFirstContent = true;
+                                        } else {
+                                            secondPart.appendChild(node);
+                                        }
+                                    } else if (node.nodeType === Node.ELEMENT_NODE && inlineTags.includes(node.tagName)) {
+                                        // 内联元素：尝试字符级分割
+                                        const inlineRes = trySplitInlineEl(node, firstPart, pageContentDiv, maxScrollH);
+                                        if (inlineRes) {
+                                            firstPart.appendChild(inlineRes.firstPart);
+                                            secondPart.appendChild(inlineRes.secondPart);
+                                            hasFirstContent = true;
+                                        } else {
+                                            secondPart.appendChild(node);
+                                        }
+                                    } else if (node.nodeType === Node.ELEMENT_NODE && splitableBlockTags.includes(node.tagName)) {
+                                        // 块级子元素（如 blockquote 内的 p）：递归分割
+                                        firstPart.appendChild(node); // 先放回再测
+                                        // 临时包装递归分割
+                                        const innerFirst = node.cloneNode(false);
+                                        const innerSecond = node.cloneNode(false);
+                                        const innerNodes = Array.from(node.cloneNode(true).childNodes);
+                                        // 用 node 自身做容器测量
+                                        node.innerHTML = '';
+                                        let innerOverflowed = false;
+                                        let innerHasFirst = false;
+                                        for (const cn of innerNodes) {
+                                            if (innerOverflowed) { innerSecond.appendChild(cn); continue; }
+                                            node.appendChild(cn);
+                                            if (pageContentDiv.scrollHeight > maxScrollH) {
+                                                node.removeChild(cn);
+                                                // 尝试文本级分割
+                                                if (cn.nodeType === Node.TEXT_NODE) {
+                                                    const t = cn.textContent;
+                                                    let a = 0, b = t.length;
+                                                    while (a < b) {
+                                                        const m = Math.ceil((a + b) / 2);
+                                                        const tmp = document.createTextNode(t.substring(0, m));
+                                                        node.appendChild(tmp);
+                                                        if (pageContentDiv.scrollHeight <= maxScrollH) a = m; else b = m - 1;
+                                                        node.removeChild(tmp);
+                                                    }
+                                                    if (a > 0) {
+                                                        node.appendChild(document.createTextNode(t.substring(0, a)));
+                                                        innerSecond.appendChild(document.createTextNode(t.substring(a)));
+                                                        innerHasFirst = true;
+                                                    } else {
+                                                        innerSecond.appendChild(cn);
+                                                    }
+                                                } else if (cn.nodeType === Node.ELEMENT_NODE && inlineTags.includes(cn.tagName)) {
+                                                    const ir = trySplitInlineEl(cn, node, pageContentDiv, maxScrollH);
+                                                    if (ir) { node.appendChild(ir.firstPart); innerSecond.appendChild(ir.secondPart); innerHasFirst = true; }
+                                                    else { innerSecond.appendChild(cn); }
+                                                } else {
+                                                    innerSecond.appendChild(cn);
+                                                }
+                                                innerOverflowed = true;
+                                            } else {
+                                                if (cn.textContent && cn.textContent.trim()) innerHasFirst = true;
+                                            }
+                                        }
+                                        if (innerHasFirst && innerSecond.childNodes.length > 0 && innerSecond.textContent.trim()) {
+                                            // 递归分割成功：node 已就地修改为 firstHalf
+                                            secondPart.appendChild(innerSecond);
+                                            hasFirstContent = true;
+                                        } else {
+                                            // 递归分割失败：整体移到 secondPart
+                                            firstPart.removeChild(node);
+                                            secondPart.appendChild(node);
+                                        }
+                                    } else {
+                                        // 其他元素：整体移到 secondPart
+                                        secondPart.appendChild(node);
+                                    }
+                                    overflowed = true;
+                                } else {
+                                    if (node.textContent && node.textContent.trim()) hasFirstContent = true;
+                                }
+                            }
+
+                            // 从页面移除 firstPart（调用方会重新添加）
+                            pageContentDiv.removeChild(firstPart);
+
+                            const hasSecond = secondPart.childNodes.length > 0
+                                           && secondPart.textContent.trim().length > 0;
+                            if (!hasFirstContent || !hasSecond) return null;
+                            return { firstPart, secondPart };
+                        }
+
+                        // 按整个元素处理（支持智能分割以减少页面底部空白）
+                        async function processElementAsWhole(element, elementIndex, depth) {
+                            depth = depth || 0;
+                            if (depth > 10) return; // 防止无限递归
+
+                            // 过滤空元素
                             const textContent = element.textContent?.trim() || '';
                             const hasContent = textContent.length > 0 || 
                                              element.tagName === 'HR' || 
                                              element.tagName === 'IMG' ||
                                              element.tagName === 'BR' ||
                                              element.querySelector('img, hr, br');
-                            
+
                             if (!hasContent) {
                                 console.log(`Skipping empty element ${elementIndex}:`, element.tagName);
                                 return;
@@ -760,29 +821,25 @@ function generatePages(markdown) {
 
                             const displayText = textContent.length > 30 ? textContent.substring(0, 30) + '...' : textContent;
                             console.log(`Adding element ${elementIndex}:`, element.tagName, displayText);
-                            
+
                             let clonedElement;
-                            
+
                             // 检查是否为表格或包含表格的元素
                             let tableElement = null;
                             if (element.tagName === 'TABLE') {
                                 tableElement = element;
                             } else {
-                                // 检查元素内部是否包含表格
                                 tableElement = element.querySelector('table');
                             }
-                            
+
                             if (tableElement) {
-                                // 计算表格的列数
                                 const firstRow = tableElement.querySelector('tr');
                                 const columnCount = firstRow ? firstRow.children.length : 0;
-                                
-                                // 如果列数超过4列，转换为图片
+
                                 if (columnCount > 4) {
                                     console.log(`Converting wide table with ${columnCount} columns to image`);
                                     const imgElement = await convertWideTableToImage(tableElement);
-                                    
-                                    // 如果原元素不是表格本身，需要替换表格部分
+
                                     if (element.tagName !== 'TABLE') {
                                         clonedElement = element.cloneNode(true);
                                         const clonedTable = clonedElement.querySelector('table');
@@ -798,53 +855,76 @@ function generatePages(markdown) {
                             } else {
                                 clonedElement = element.cloneNode(true);
                             }
-                            
-                            // 如果当前页面为空，直接添加第一个元素（避免第一页空白）
+
+                            // === 1. 首元素直接添加 ===
                             if (pageContentDiv.children.length === 0) {
                                 pageContentDiv.appendChild(clonedElement);
+                                // 空白页也溢出 → 尝试分割
+                                if (pageContentDiv.scrollHeight > contentHeight + 20 && isBlockSplittable(clonedElement)) {
+                                    pageContentDiv.removeChild(clonedElement);
+                                    const sr = trySplitBlock(clonedElement);
+                                    if (sr) {
+                                        pageContentDiv.appendChild(sr.firstPart);
+                                        createNewPage();
+                                        await processElementAsWhole(sr.secondPart, elementIndex, depth + 1);
+                                        return;
+                                    }
+                                    pageContentDiv.appendChild(clonedElement); // 分割失败，仍放入
+                                }
                                 console.log(`First element added to page.`);
                                 return;
                             }
-                            
-                            // 临时添加到当前页面以测试高度
+
+                            // === 2. 尝试放入当前页 ===
                             pageContentDiv.appendChild(clonedElement);
-                            pageContentDiv.offsetHeight;
+                            pageContentDiv.offsetHeight; // 强制布局
                             const currentHeight = pageContentDiv.scrollHeight;
-                            
+
                             console.log(`Page height after adding: ${currentHeight}/${contentHeight}`);
 
-                            // 检查是否超出页面高度（使用更宽松的容错值）
-                            if (currentHeight > contentHeight + 20) {
-                                console.log(`Page overflow! Current: ${currentHeight}px, Limit: ${contentHeight + 20}px`);
-                                // 移除刚添加的元素（因为放不下）
+                            if (currentHeight <= contentHeight + 20) {
+                                console.log(`Element fits on current page.`);
+                                return; // 放得下，完成
+                            }
+
+                            // === 3. 溢出 — 尝试智能分割 ===
+                            console.log(`Page overflow! Attempting smart split...`);
+                            pageContentDiv.removeChild(clonedElement);
+
+                            // 始终尝试分割可拆分元素，不设最小空间限制
+                            if (isBlockSplittable(clonedElement)) {
+                                const sr = trySplitBlock(clonedElement);
+                                if (sr) {
+                                    console.log(`Split successful! First part stays, second part to new page.`);
+                                    pageContentDiv.appendChild(sr.firstPart);
+                                    createNewPage();
+                                    await processElementAsWhole(sr.secondPart, elementIndex, depth + 1);
+                                    return;
+                                }
+                            }
+
+                            // === 4. 无法分割 — 整体移到新页 ===
+                            console.log(`Creating new page for element.`);
+                            createNewPage();
+                            pageContentDiv.appendChild(clonedElement);
+
+                            // 新页也溢出 → 再尝试分割
+                            if (pageContentDiv.scrollHeight > contentHeight + 20 && isBlockSplittable(clonedElement)) {
                                 pageContentDiv.removeChild(clonedElement);
-                                
-                                // 创建新页面
-                                console.log(`Creating new page. Previous page has ${pageContentDiv.children.length} elements.`);
-                                createNewPage();
-                                
-                                // 将元素添加到新页面
-                                pageContentDiv.appendChild(clonedElement);
-                                console.log(`Element added to new page.`);
-                            } else {
-                                console.log(`Element fits on current page. Height: ${currentHeight}/${contentHeight + 20}`);
+                                const sr = trySplitBlock(clonedElement);
+                                if (sr) {
+                                    pageContentDiv.appendChild(sr.firstPart);
+                                    createNewPage();
+                                    await processElementAsWhole(sr.secondPart, elementIndex, depth + 1);
+                                    return;
+                                }
+                                pageContentDiv.appendChild(clonedElement); // 放弃分割
                             }
                         }
-                        
-                        // 处理元素的主函数，根据元素类型选择处理方式
+
+                        // 处理元素的主函数
                         async function processElement(element, elementIndex) {
-                            // 不可分割的元素类型：表格、图片、链接、水平线、代码块等
-                            const indivisibleElements = ['TABLE', 'IMG', 'A', 'HR', 'PRE', 'CODE', 'BLOCKQUOTE'];
-                            
-                            // 检查元素本身是否是不可分割类型，或者包含这些元素
-                            if (indivisibleElements.includes(element.tagName) || 
-                                element.querySelector('img, a, table, hr, pre, code, blockquote')) {
-                                // 按整个元素处理
-                                return await processElementAsWhole(element, elementIndex);
-                            } else {
-                                // 按行分页处理
-                                return await processTextElementByLines(element, elementIndex);
-                            }
+                            await processElementAsWhole(element, elementIndex);
                         }
 
                         // 处理列表项分页的函数
@@ -913,6 +993,18 @@ function generatePages(markdown) {
                                     if (currentHeight > contentHeight + 20) {
                                         // 移除刚添加的项目
                                         lastChild.removeChild(clonedItem);
+                                        
+                                        // 尝试分割此列表项以填满当前页面
+                                        if (isBlockSplittable(clonedItem)) {
+                                            // 临时把 clonedItem 放回列表以测量
+                                            lastChild.appendChild(clonedItem);
+                                            const sr = trySplitBlock(clonedItem);
+                                            lastChild.removeChild(clonedItem);
+                                            if (sr) {
+                                                lastChild.appendChild(sr.firstPart);
+                                                clonedItem = sr.secondPart; // 剩余部分到新页
+                                            }
+                                        }
                                         
                                         // 创建新页面
                                         createNewPage();
