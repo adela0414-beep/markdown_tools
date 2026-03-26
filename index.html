@@ -226,6 +226,10 @@
                 <h1 class="text-xl font-bold text-gray-800">Markdown 智能分页切图工具</h1>
             </div>
             <div class="flex items-center gap-4">
+                <button id="copy-html-btn" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>
+                    复制 HTML
+                </button>
                 <button id="export-zip-btn" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
                     导出图片 (ZIP)
@@ -344,6 +348,7 @@
                 const fontSizeSlider = document.getElementById('font-size-slider');
                 const fontSizeValue = document.getElementById('font-size-value');
                 const watermarkCheckbox = document.getElementById('watermark-checkbox');
+                const copyHtmlBtn = document.getElementById('copy-html-btn');
                 const exportBtn = document.getElementById('export-zip-btn');
                 const loadingIndicator = document.getElementById('loading-indicator');
 
@@ -1241,6 +1246,25 @@ function generatePages(markdown) {
                 watermarkCheckbox.addEventListener('change', (e) => {
                     state.showWatermark = e.target.checked;
                     renderAndPaginate();
+                });
+
+                // --- COPY HTML LOGIC ---
+                copyHtmlBtn.addEventListener('click', async () => {
+                    const processedMarkdown = state.markdown.replace(/\\n/g, '\n');
+                    const rawHtml = marked.parse(processedMarkdown);
+                    try {
+                        const blob = new Blob([rawHtml], { type: 'text/html' });
+                        const clipboardItem = new ClipboardItem({
+                            'text/html': blob,
+                            'text/plain': new Blob([rawHtml], { type: 'text/plain' })
+                        });
+                        await navigator.clipboard.write([clipboardItem]);
+                        const originalText = copyHtmlBtn.textContent;
+                        copyHtmlBtn.textContent = '✓ 已复制';
+                        setTimeout(() => { copyHtmlBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>复制 HTML'; }, 1500);
+                    } catch (err) {
+                        console.error('Copy failed:', err);
+                    }
                 });
 
                 // --- EXPORT LOGIC ---
