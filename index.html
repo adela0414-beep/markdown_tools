@@ -798,6 +798,9 @@ function generatePages(markdown) {
                             const maxScrollH = contentHeight + 20;
                             const inlineTags = ['STRONG', 'EM', 'A', 'SPAN', 'CODE', 'B', 'I', 'U', 'S', 'SUB', 'SUP', 'MARK'];
 
+                            // 保存原始 HTML，以便分割失败时恢复
+                            const savedHTML = element.innerHTML;
+
                             // 保存原始子节点
                             const origChildren = Array.from(element.childNodes).map(n => n.cloneNode(true));
                             // 清空元素
@@ -872,7 +875,11 @@ function generatePages(markdown) {
                             }
 
                             const hasSecond = secondPart.childNodes.length > 0 && secondPart.textContent.trim().length > 0;
-                            if (!hasFirstContent || !hasSecond) return null;
+                            if (!hasFirstContent || !hasSecond) {
+                                // 分割失败，恢复元素原始内容
+                                element.innerHTML = savedHTML;
+                                return null;
+                            }
                             return { secondPart };
                             // 注意：firstPart 就是 element 本身（已就地修改）
                         }
@@ -946,16 +953,17 @@ function generatePages(markdown) {
                                     newList.appendChild(remainder);
 
                                     // 新页也可能溢出（超长项），循环分割
+                                    let currentRemainder = remainder;
                                     let safetyCounter = 0;
                                     while (pageContentDiv.scrollHeight > contentHeight + 20 && safetyCounter < 20) {
                                         safetyCounter++;
-                                        const sr2 = splitMountedElement(remainder);
+                                        const sr2 = splitMountedElement(currentRemainder);
                                         if (!sr2) break;
                                         const nextRemainder = sr2.secondPart;
                                         createNewPage();
                                         newList = ensureListOnPage(i);
                                         newList.appendChild(nextRemainder);
-                                        // remainder 变为新的待检查元素
+                                        currentRemainder = nextRemainder;
                                     }
                                 } else {
                                     // 分割失败 — 整体移到新页
