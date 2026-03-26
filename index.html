@@ -880,6 +880,10 @@ function generatePages(markdown) {
                                 element.innerHTML = savedHTML;
                                 return null;
                             }
+                            // 续页的 <li> 隐藏项目符号（它是上一页内容的延续，不是新条目）
+                            if (secondPart.tagName === 'LI') {
+                                secondPart.style.listStyleType = 'none';
+                            }
                             return { secondPart };
                             // 注意：firstPart 就是 element 本身（已就地修改）
                         }
