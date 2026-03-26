@@ -932,6 +932,74 @@ function generatePages(markdown) {
                             await processElementAsWhole(element, elementIndex);
                         }
 
+                        // 在列表上下文中分割列表项（<li>）的函数
+                        // 与 trySplitBlock 类似，但在 list > li 的真实 DOM 结构中测量高度
+                        function trySplitListItem(liElement, listContainer) {
+                            const maxScrollH = contentHeight + 20;
+                            const firstLi = liElement.cloneNode(false);
+                            const secondLi = liElement.cloneNode(false);
+
+                            const source = liElement.cloneNode(true);
+                            const childNodes = Array.from(source.childNodes);
+
+                            // 将 firstLi 挂到 list 中测量
+                            listContainer.appendChild(firstLi);
+
+                            let overflowed = false;
+                            let hasFirstContent = false;
+                            const inlineTags = ['STRONG', 'EM', 'A', 'SPAN', 'CODE', 'B', 'I', 'U', 'S', 'SUB', 'SUP', 'MARK'];
+
+                            for (const node of childNodes) {
+                                if (overflowed) { secondLi.appendChild(node); continue; }
+                                firstLi.appendChild(node);
+                                if (pageContentDiv.scrollHeight > maxScrollH) {
+                                    firstLi.removeChild(node);
+                                    if (node.nodeType === Node.TEXT_NODE) {
+                                        const txt = node.textContent;
+                                        let lo = 0, hi = txt.length;
+                                        while (lo < hi) {
+                                            const mid = Math.ceil((lo + hi) / 2);
+                                            const tn = document.createTextNode(txt.substring(0, mid));
+                                            firstLi.appendChild(tn);
+                                            if (pageContentDiv.scrollHeight <= maxScrollH) lo = mid; else hi = mid - 1;
+                                            firstLi.removeChild(tn);
+                                        }
+                                        if (lo > 0) {
+                                            firstLi.appendChild(document.createTextNode(txt.substring(0, lo)));
+                                            secondLi.appendChild(document.createTextNode(txt.substring(lo)));
+                                            hasFirstContent = true;
+                                        } else { secondLi.appendChild(node); }
+                                    } else if (node.nodeType === Node.ELEMENT_NODE && inlineTags.includes(node.tagName)) {
+                                        const ir = trySplitInlineEl(node, firstLi, pageContentDiv, maxScrollH);
+                                        if (ir) { firstLi.appendChild(ir.firstPart); secondLi.appendChild(ir.secondPart); hasFirstContent = true; }
+                                        else { secondLi.appendChild(node); }
+                                    } else if (node.nodeType === Node.ELEMENT_NODE && ['P', 'DIV', 'BLOCKQUOTE'].includes(node.tagName)) {
+                                        // 块级子元素递归分割
+                                        firstLi.appendChild(node);
+                                        node.innerHTML = '';
+                                        const innerNodes = Array.from(node.cloneNode(false).childNodes.length === 0 ? [] : []);
+                                        // 用原始内容重建
+                                        const origNode = source.querySelector(node.tagName) || node;
+                                        const innerSource = document.createElement(node.tagName);
+                                        // 直接用已有的 childNodes
+                                        const origChildren = Array.from(liElement.cloneNode(true).querySelectorAll(node.tagName));
+                                        // 简化：对块级子元素整体移到 secondLi
+                                        firstLi.removeChild(node);
+                                        secondLi.appendChild(node);
+                                    } else {
+                                        secondLi.appendChild(node);
+                                    }
+                                    overflowed = true;
+                                } else {
+                                    if (node.textContent && node.textContent.trim()) hasFirstContent = true;
+                                }
+                            }
+                            listContainer.removeChild(firstLi);
+                            const hasSecond = secondLi.childNodes.length > 0 && secondLi.textContent.trim().length > 0;
+                            if (!hasFirstContent || !hasSecond) return null;
+                            return { firstPart: firstLi, secondPart: secondLi };
+                        }
+
                         // 处理列表项分页的函数
                         async function processListElement(listElement, elementIndex) {
                             const listItems = Array.from(listElement.children);
@@ -941,124 +1009,118 @@ function generatePages(markdown) {
                             }
 
                             console.log(`Processing list with ${listItems.length} items`);
-                            
-                            // 创建一个新的列表容器
-                            let currentList = document.createElement(listElement.tagName);
-                            currentList.className = listElement.className;
-                            
-                            // 保持有序列表的起始序号
-                            let currentStartNumber = 1;
-                            if (listElement.tagName === 'OL') {
-                                const startAttr = listElement.getAttribute('start');
-                                currentStartNumber = startAttr ? parseInt(startAttr) : 1;
-                                currentList.setAttribute('start', currentStartNumber);
+
+                            // 确保页面上有一个当前列表容器
+                            function ensureListOnPage(itemIndex) {
+                                // 检查 pageContentDiv 最后一个子元素是否是同类型列表
+                                const last = pageContentDiv.lastElementChild;
+                                if (last && last.tagName === listElement.tagName && last._isSameList) {
+                                    return last;
+                                }
+                                // 创建新列表
+                                const newList = document.createElement(listElement.tagName);
+                                newList.className = listElement.className;
+                                newList._isSameList = true; // 标记
+                                if (listElement.tagName === 'OL') {
+                                    const startAttr = listElement.getAttribute('start');
+                                    const base = startAttr ? parseInt(startAttr) : 1;
+                                    newList.setAttribute('start', base + itemIndex);
+                                }
+                                pageContentDiv.appendChild(newList);
+                                return newList;
                             }
-                            
+
                             for (let i = 0; i < listItems.length; i++) {
                                 const listItem = listItems[i];
-                                
-                                // 检查列表项内是否包含宽表格，如果有则转换为图片
                                 let clonedItem = listItem.cloneNode(true);
+
+                                // 宽表格转图片
                                 const tableInItem = clonedItem.querySelector('table');
                                 if (tableInItem) {
                                     const firstRow = tableInItem.querySelector('tr');
                                     const columnCount = firstRow ? firstRow.children.length : 0;
-                                    
                                     if (columnCount > 4) {
-                                        console.log(`Converting wide table with ${columnCount} columns inside list item to image`);
                                         const imgElement = await convertWideTableToImage(tableInItem);
                                         tableInItem.replaceWith(imgElement);
                                     }
                                 }
-                                
-                                // 创建临时列表来测试高度
-                                const tempList = currentList.cloneNode(true);
-                                tempList.appendChild(clonedItem);
-                                
-                                // 如果当前页面为空，直接添加列表
+
+                                // 空页面直接放
                                 if (pageContentDiv.children.length === 0) {
-                                    currentList.appendChild(clonedItem);
-                                    pageContentDiv.appendChild(currentList);
-                                    console.log(`First list item added to page.`);
-                                    continue;
-                                }
-                                
-                                // 检查最后一个元素是否为相同类型的列表
-                                const lastChild = pageContentDiv.lastElementChild;
-                                const canMergeWithLastList = lastChild && 
-                                    lastChild.tagName === listElement.tagName && 
-                                    lastChild.className === listElement.className;
-                                
-                                if (canMergeWithLastList) {
-                                    // 尝试添加到现有列表
-                                    lastChild.appendChild(clonedItem);
-                                    pageContentDiv.offsetHeight;
-                                    const currentHeight = pageContentDiv.scrollHeight;
-                                    
-                                    if (currentHeight > contentHeight + 20) {
-                                        // 移除刚添加的项目
-                                        lastChild.removeChild(clonedItem);
-                                        
-                                        // 尝试分割此列表项以填满当前页面
-                                        if (isBlockSplittable(clonedItem)) {
-                                            // 临时把 clonedItem 放回列表以测量
-                                            lastChild.appendChild(clonedItem);
-                                            const sr = trySplitBlock(clonedItem);
-                                            lastChild.removeChild(clonedItem);
-                                            if (sr) {
-                                                lastChild.appendChild(sr.firstPart);
-                                                clonedItem = sr.secondPart; // 剩余部分到新页
+                                    const list = ensureListOnPage(i);
+                                    list.appendChild(clonedItem);
+
+                                    // 即使空页也可能溢出（超长列表项）
+                                    if (pageContentDiv.scrollHeight > contentHeight + 20) {
+                                        const sr = trySplitListItem(clonedItem, list);
+                                        if (sr) {
+                                            list.removeChild(clonedItem);
+                                            list.appendChild(sr.firstPart);
+                                            createNewPage();
+                                            // 剩余部分作为新的 clonedItem 继续处理（可能还需要再分割）
+                                            clonedItem = sr.secondPart;
+                                            const newList = ensureListOnPage(i);
+                                            newList.appendChild(clonedItem);
+                                            // 递归检查是否仍然溢出
+                                            while (pageContentDiv.scrollHeight > contentHeight + 20) {
+                                                const sr2 = trySplitListItem(clonedItem, newList.tagName === listElement.tagName ? pageContentDiv.lastElementChild : newList);
+                                                if (!sr2) break;
+                                                const parentList = clonedItem.parentElement;
+                                                parentList.removeChild(clonedItem);
+                                                parentList.appendChild(sr2.firstPart);
+                                                createNewPage();
+                                                clonedItem = sr2.secondPart;
+                                                const nextList = ensureListOnPage(i);
+                                                nextList.appendChild(clonedItem);
                                             }
                                         }
-                                        
-                                        // 创建新页面
-                                        createNewPage();
-                                        
-                                        // 在新页面创建新列表，保持序号连续性
-                                        currentList = document.createElement(listElement.tagName);
-                                        currentList.className = listElement.className;
-                                        
-                                        // 为有序列表设置正确的起始序号
-                                        if (listElement.tagName === 'OL') {
-                                            const newStartNumber = currentStartNumber + i;
-                                            currentList.setAttribute('start', newStartNumber);
-                                            console.log(`Setting OL start number to ${newStartNumber}`);
-                                        }
-                                        
-                                        currentList.appendChild(clonedItem);
-                                        pageContentDiv.appendChild(currentList);
-                                        console.log(`List item moved to new page.`);
-                                    } else {
-                                        console.log(`List item merged with existing list.`);
                                     }
-                                } else {
-                                    // 最后一个元素不是相同类型的列表，创建新的列表
-                                    currentList = document.createElement(listElement.tagName);
-                                    currentList.className = listElement.className;
-                                    
-                                    // 为有序列表设置正确的起始序号
-                                    if (listElement.tagName === 'OL') {
-                                        const newStartNumber = currentStartNumber + i;
-                                        currentList.setAttribute('start', newStartNumber);
-                                        console.log(`Setting OL start number to ${newStartNumber}`);
-                                    }
-                                    
-                                    currentList.appendChild(clonedItem);
-                                    
-                                    // 测试是否能放入当前页面
-                                    pageContentDiv.appendChild(currentList);
-                                    pageContentDiv.offsetHeight;
-                                    const currentHeight = pageContentDiv.scrollHeight;
-                                    
-                                    if (currentHeight > contentHeight + 20) {
-                                        // 移除列表，创建新页面
-                                        pageContentDiv.removeChild(currentList);
-                                        createNewPage();
-                                        pageContentDiv.appendChild(currentList);
-                                        console.log(`New list created on new page.`);
-                                    } else {
-                                        console.log(`New list created on current page.`);
-                                    }
+                                    continue;
+                                }
+
+                                // 获取或创建当前列表
+                                const list = ensureListOnPage(i);
+                                list.appendChild(clonedItem);
+                                pageContentDiv.offsetHeight;
+
+                                if (pageContentDiv.scrollHeight <= contentHeight + 20) {
+                                    // 放得下
+                                    console.log(`List item ${i} fits on current page.`);
+                                    continue;
+                                }
+
+                                // 溢出 — 先移除，尝试分割填满当前页
+                                list.removeChild(clonedItem);
+
+                                // 尝试分割列表项
+                                list.appendChild(clonedItem); // 挂回去测量
+                                const sr = trySplitListItem(clonedItem, list);
+                                list.removeChild(clonedItem);
+
+                                if (sr) {
+                                    console.log(`List item ${i} split successfully.`);
+                                    list.appendChild(sr.firstPart);
+                                    clonedItem = sr.secondPart;
+                                }
+
+                                // 换页，将剩余部分放到新页
+                                createNewPage();
+                                const newList = ensureListOnPage(i);
+                                newList.appendChild(clonedItem);
+
+                                // 新页也可能溢出（超长项），循环分割
+                                let safetyCounter = 0;
+                                while (pageContentDiv.scrollHeight > contentHeight + 20 && safetyCounter < 20) {
+                                    safetyCounter++;
+                                    const curList = clonedItem.parentElement;
+                                    const sr2 = trySplitListItem(clonedItem, curList);
+                                    if (!sr2) break;
+                                    curList.removeChild(clonedItem);
+                                    curList.appendChild(sr2.firstPart);
+                                    createNewPage();
+                                    clonedItem = sr2.secondPart;
+                                    const nextList = ensureListOnPage(i);
+                                    nextList.appendChild(clonedItem);
                                 }
                             }
                         }
