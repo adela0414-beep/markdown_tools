@@ -506,6 +506,8 @@ function generatePages(markdown) {
                         
                         const pageHeight = 440; // Fixed page height
                         const contentHeight = pageHeight - (state.padding * 2);
+                        // 无水印时内容可以填满更多页面空间
+                        const overflowTolerance = state.showWatermark ? 20 : 35;
 
                         let currentPageDiv;
                         let pageContentDiv;
@@ -729,7 +731,7 @@ function generatePages(markdown) {
                             if (pageContentDiv.children.length === 0) {
                                 pageContentDiv.appendChild(clonedElement);
                                 // 空白页也溢出 → 尝试原地分割
-                                if (pageContentDiv.scrollHeight > contentHeight + 20 && isBlockSplittable(clonedElement)) {
+                                if (pageContentDiv.scrollHeight > contentHeight + overflowTolerance && isBlockSplittable(clonedElement)) {
                                     const sr = splitMountedElement(clonedElement);
                                     if (sr) {
                                         // clonedElement 已就地修改为前半部分
@@ -749,7 +751,7 @@ function generatePages(markdown) {
 
                             console.log(`Page height after adding: ${currentHeight}/${contentHeight}`);
 
-                            if (currentHeight <= contentHeight + 20) {
+                            if (currentHeight <= contentHeight + overflowTolerance) {
                                 console.log(`Element fits on current page.`);
                                 return; // 放得下，完成
                             }
@@ -775,7 +777,7 @@ function generatePages(markdown) {
                             pageContentDiv.appendChild(clonedElement);
 
                             // 新页也溢出 → 再尝试分割
-                            if (pageContentDiv.scrollHeight > contentHeight + 20 && isBlockSplittable(clonedElement)) {
+                            if (pageContentDiv.scrollHeight > contentHeight + overflowTolerance && isBlockSplittable(clonedElement)) {
                                 const sr = splitMountedElement(clonedElement);
                                 if (sr) {
                                     // clonedElement 已就地修改
@@ -795,7 +797,7 @@ function generatePages(markdown) {
                         // element 必须已经挂在 pageContentDiv 的子树中
                         // 返回 { firstPart, secondPart } 或 null
                         function splitMountedElement(element) {
-                            const maxScrollH = contentHeight + 20;
+                            const maxScrollH = contentHeight + overflowTolerance;
                             const inlineTags = ['STRONG', 'EM', 'A', 'SPAN', 'CODE', 'B', 'I', 'U', 'S', 'SUB', 'SUP', 'MARK'];
 
                             // 保存原始 HTML，以便分割失败时恢复
@@ -936,7 +938,7 @@ function generatePages(markdown) {
                                 list.appendChild(clonedItem);
                                 pageContentDiv.offsetHeight; // 强制布局
 
-                                if (pageContentDiv.scrollHeight <= contentHeight + 20) {
+                                if (pageContentDiv.scrollHeight <= contentHeight + overflowTolerance) {
                                     // 放得下
                                     console.log(`List item ${i} fits on current page.`);
                                     continue;
@@ -959,7 +961,7 @@ function generatePages(markdown) {
                                     // 新页也可能溢出（超长项），循环分割
                                     let currentRemainder = remainder;
                                     let safetyCounter = 0;
-                                    while (pageContentDiv.scrollHeight > contentHeight + 20 && safetyCounter < 20) {
+                                    while (pageContentDiv.scrollHeight > contentHeight + overflowTolerance && safetyCounter < 20) {
                                         safetyCounter++;
                                         const sr2 = splitMountedElement(currentRemainder);
                                         if (!sr2) break;
