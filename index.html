@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>交互式原型：Markdown 智能分页切图工具</title>
-    
+    <title>口袋专用：Markdown 智能分页切图工具</title>
+
     <!-- Chosen Palette: Warm Neutrals -->
     <!-- Application Structure Plan: 采用经典的双栏布局。左侧为控制面板，包含Markdown编辑器和所有样式自定义选项，使用户可以方便地输入内容并调整外观。右侧为实时预览区域，即时反馈用户的每一次修改，忠实模拟最终的图片分页效果。这种结构将“输入/控制”与“输出/结果”清晰分离，符合创作者工具的直觉，实现了“所见即所得”的核心用户流程：编辑 -> 预览 -> 调整 -> 导出。 -->
     <!-- Visualization & Content Choices: PRD -> 核心目标是将Markdown渲染为分页图片。 -> 呈现方式是使用HTML/CSS在DOM中创建模拟页面，并用JS实现智能分页算法。 -> 交互核心是编辑器的`input`事件触发实时重新渲染和分页。->  justification: 这是实现实时预览和复杂分页逻辑的最直接、最高效的方式。 -> 使用的库: Tailwind CSS (布局), marked.js (Markdown解析), highlight.js (代码高亮), html2canvas.js (截图), jszip.js (打包)。 -->
@@ -16,31 +17,37 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dom-to-image/2.6.0/dom-to-image.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Serif+SC:wght@400;700&display=swap');
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
-            background-color: #F8F5F2; /* Warm Neutral Background */
+            background-color: #F8F5F2;
+            /* Warm Neutral Background */
         }
+
         .preview-page {
             width: 330px;
             min-height: 440px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             overflow: visible;
             flex-shrink: 0;
             background-color: white;
             transition: all 0.2s ease-in-out;
-            position: relative; /* 明确设置定位，确保包含绝对定位的子元素 */
+            position: relative;
+            /* 明确设置定位，确保包含绝对定位的子元素 */
         }
+
         .preview-page-content {
             box-sizing: border-box;
             overflow: visible;
             overflow-wrap: break-word;
             line-break: strict;
         }
+
         .rendered-content h1 {
             font-size: 1.3em;
             font-weight: bold;
@@ -49,6 +56,7 @@
             border-bottom: 2px solid currentColor;
             padding-bottom: 0.2em;
         }
+
         .rendered-content h2 {
             font-size: 1.1em;
             font-weight: bolder;
@@ -57,21 +65,29 @@
             border-left: 5px solid currentColor;
             line-height: 1.3;
         }
+
         .rendered-content h3 {
             font-size: 0.875em;
             margin: 0.3em 0 0.2em 0;
             line-height: 1.3;
             font-weight: bold;
         }
-        .rendered-content h1:first-child, .rendered-content h2:first-child, .rendered-content h3:first-child {
+
+        .rendered-content h1:first-child,
+        .rendered-content h2:first-child,
+        .rendered-content h3:first-child {
             margin-top: 0;
         }
-        .rendered-content h4, .rendered-content h5, .rendered-content h6 {
+
+        .rendered-content h4,
+        .rendered-content h5,
+        .rendered-content h6 {
             font-size: 0.875em;
             line-height: 1.3;
             margin: 0.4em 0 0.2em 0;
             font-weight: bold;
         }
+
         .rendered-content p {
             margin: 0.3em 0.4em;
             line-height: 1.6;
@@ -79,27 +95,35 @@
             font-size: 0.875em;
             word-spacing: 0.05em;
         }
+
         .rendered-content p:empty {
             display: none;
         }
-        .rendered-content ul, .rendered-content ol {
+
+        .rendered-content ul,
+        .rendered-content ol {
             font-size: 0.875em;
             margin-left: 1.2em;
             margin-bottom: 0.8em;
             padding-left: 0.8em;
         }
+
         .rendered-content ul {
             list-style-type: disc;
         }
+
         .rendered-content ol {
             list-style-type: decimal;
         }
+
         .rendered-content ul ul {
             list-style-type: circle;
         }
+
         .rendered-content ul ul ul {
             list-style-type: square;
         }
+
         .rendered-content li {
             font-size: 1em;
             margin-bottom: 0.3em;
@@ -107,9 +131,11 @@
             display: list-item;
             vertical-align: baseline;
         }
+
         .rendered-content li::marker {
             vertical-align: baseline;
         }
+
         .rendered-content blockquote {
             font-style: normal;
             border-left: none;
@@ -120,17 +146,20 @@
             margin: 0.5em 0;
             /* color, background, box-shadow will be set by theme */
         }
+
         .rendered-content blockquote p {
             font-size: 0.8em !important;
             margin: 0 !important;
             letter-spacing: normal !important;
             /* color will be set by theme */
         }
+
         .rendered-content img {
             max-width: 100%;
             border-radius: 8px;
             margin-bottom: 0.8em;
         }
+
         .rendered-content pre {
             margin: 0.5em 0;
             padding: 0.5em;
@@ -138,37 +167,43 @@
             line-height: 1.4;
             overflow-x: auto;
         }
+
         .rendered-content code {
-            color: rgb(271,93,108);
+            color: rgb(271, 93, 108);
             background-color: #f3f4f6;
             padding: 0.2em 0.4em;
             border-radius: 3px;
             font-family: 'Courier New', Courier, monospace;
             font-size: 0.9em;
         }
+
         .rendered-content pre code {
             background-color: transparent;
             padding: 0;
             color: inherit;
         }
+
         .rendered-content strong {
             font-weight: bold;
             vertical-align: baseline;
             line-height: inherit;
             /* color will be set by theme */
         }
+
         .rendered-content em {
             letter-spacing: 0.3em;
             vertical-align: baseline;
             line-height: inherit;
             /* color will be set by theme */
         }
+
         .rendered-content a {
             text-decoration: none;
             vertical-align: baseline;
             line-height: inherit;
             /* color and border-bottom will be set by theme */
         }
+
         .rendered-content table {
             width: 100%;
             border-collapse: collapse;
@@ -176,7 +211,9 @@
             border: 1px solid #ddd;
             background-color: #fff;
         }
-        .rendered-content th, .rendered-content td {
+
+        .rendered-content th,
+        .rendered-content td {
             font-size: 0.875em;
             border: 1px solid #ddd;
             padding: 0.5em 0.8em;
@@ -185,23 +222,27 @@
             word-wrap: break-word;
             max-width: 200px;
         }
+
         .rendered-content th {
             font-weight: bold;
             background-color: #f8f9fa;
             color: #333;
         }
+
         .rendered-content tbody tr:nth-child(even) {
             background-color: #f8f9fa;
         }
+
         .rendered-content tbody tr:hover {
             background-color: #e9ecef;
         }
+
         .rendered-content hr {
             height: 1px;
             padding: 0;
             border: none;
             text-align: center;
-            background-image: linear-gradient(to right, rgba(248,57,41,0), rgba(248,57,41,0.75), rgba(248,57,41,0));
+            background-image: linear-gradient(to right, rgba(248, 57, 41, 0), rgba(248, 57, 41, 0.75), rgba(248, 57, 41, 0));
             margin: 0.8em 0;
         }
 
@@ -211,30 +252,44 @@
             top: -9999px;
             left: -9999px;
             visibility: hidden;
-            width: 330px; /* Same as preview page */
+            width: 330px;
+            /* Same as preview page */
         }
     </style>
 </head>
+
 <body class="text-gray-800">
     <div class="flex flex-col h-screen">
         <!-- Header -->
-        <header class="bg-white/80 backdrop-blur-sm border-b border-gray-200/80 p-4 flex justify-between items-center z-20">
+        <header
+            class="bg-white/80 backdrop-blur-sm border-b border-gray-200/80 p-4 flex justify-between items-center z-20">
             <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
+                <div
+                    class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center text-white font-bold text-xl">
                     <span>M</span>
                 </div>
                 <h1 class="text-xl font-bold text-gray-800">Markdown 智能分页切图工具</h1>
             </div>
             <div class="flex items-center gap-4">
-                <button id="copy-html-btn" class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>
+                <button id="copy-html-btn"
+                    class="bg-gray-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                        <path
+                            d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                    </svg>
                     复制 HTML
                 </button>
-                <button id="export-zip-btn" class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+                <button id="export-zip-btn"
+                    class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd"
+                            d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                            clip-rule="evenodd" />
+                    </svg>
                     导出图片 (ZIP)
                 </button>
-                 <div id="loading-indicator" class="hidden items-center gap-2">
+                <div id="loading-indicator" class="hidden items-center gap-2">
                     <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-orange-500"></div>
                     <span>处理中...</span>
                 </div>
@@ -243,22 +298,26 @@
 
         <div class="flex flex-grow overflow-hidden">
             <!-- Left: Controls -->
-            <aside class="w-1/3 min-w-[400px] max-w-[600px] bg-white border-r border-gray-200/80 flex flex-col p-6 overflow-y-auto">
+            <aside
+                class="w-1/3 min-w-[400px] max-w-[600px] bg-white border-r border-gray-200/80 flex flex-col p-6 overflow-y-auto">
                 <!-- Editor Section -->
                 <div class="flex flex-col" style="height: 320px;">
                     <h2 class="text-lg font-bold mb-3">1. 编写内容</h2>
                     <p class="text-sm text-gray-500 mb-4">在此处输入或粘贴您的 Markdown 内容。右侧将实时展示分页后的预览效果。</p>
-                    <textarea id="markdown-input" class="w-full flex-grow border border-gray-300 rounded-lg p-4 text-sm leading-6 resize-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition" spellcheck="false"></textarea>
+                    <textarea id="markdown-input"
+                        class="w-full flex-grow border border-gray-300 rounded-lg p-4 text-sm leading-6 resize-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
+                        spellcheck="false"></textarea>
                 </div>
                 <!-- Customization Section -->
                 <div class="mt-8 flex-grow">
                     <h2 class="text-lg font-bold mb-4">2. 自定义样式</h2>
-                    
+
                     <!-- 第一行：主题和字体 -->
                     <div class="grid grid-cols-2 gap-4 mb-4">
                         <div>
                             <label for="theme-select" class="block text-sm font-medium text-gray-700 mb-2">主题风格</label>
-                            <select id="theme-select" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
+                            <select id="theme-select"
+                                class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
                                 <option value="sunshine">小太阳（默认）</option>
                                 <option value="liuliu">六六</option>
                                 <option value="liuliu2">六六2</option>
@@ -268,8 +327,11 @@
 
                         <div>
                             <label for="font-select" class="block text-sm font-medium text-gray-700 mb-2">内容字体</label>
-                            <select id="font-select" class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
-                                <option value="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif">系统默认字体</option>
+                            <select id="font-select"
+                                class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
+                                <option
+                                    value="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif">
+                                    系统默认字体</option>
                                 <option value="'Inter', 'Noto Serif SC', sans-serif">现代无衬线</option>
                                 <option value="'Noto Serif SC', serif">典雅衬线体</option>
                             </select>
@@ -282,26 +344,30 @@
                             <label for="font-size-slider" class="block text-sm font-medium text-gray-700 mb-2">
                                 字体大小: <span id="font-size-value" class="text-orange-600 font-semibold">13</span>px
                             </label>
-                            <input id="font-size-slider" type="range" min="12" max="24" value="13" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
+                            <input id="font-size-slider" type="range" min="12" max="24" value="13"
+                                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
                         </div>
                         <div>
                             <label for="padding-slider" class="block text-sm font-medium text-gray-700 mb-2">
                                 页面边距: <span id="padding-value" class="text-orange-600 font-semibold">15</span>px
                             </label>
-                            <input id="padding-slider" type="range" min="10" max="60" value="15" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
+                            <input id="padding-slider" type="range" min="10" max="60" value="15"
+                                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
                         </div>
                     </div>
 
                     <!-- 第三行：水印选项 -->
                     <div class="pt-3 border-t border-gray-200">
                         <div class="flex items-center">
-                            <input id="watermark-checkbox" type="checkbox" checked class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer">
-                            <label for="watermark-checkbox" class="ml-2 block text-sm font-medium text-gray-700 cursor-pointer">显示水印</label>
+                            <input id="watermark-checkbox" type="checkbox" checked
+                                class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer">
+                            <label for="watermark-checkbox"
+                                class="ml-2 block text-sm font-medium text-gray-700 cursor-pointer">显示水印</label>
                         </div>
                     </div>
                 </div>
             </aside>
-            
+
             <!-- Right: Preview -->
             <main class="w-2/3 flex-grow bg-gray-100 p-8 overflow-y-auto">
                 <div id="preview-area" class="flex flex-wrap gap-8 justify-center">
@@ -310,7 +376,7 @@
             </main>
         </div>
     </div>
-    
+
     <!-- This is hidden. It's used to render the full content to calculate pagination -->
     <div id="hidden-renderer"></div>
 
@@ -483,27 +549,30 @@ function generatePages(markdown) {
                 };
 
 
-                
+
                 // --- RENDER & PAGINATION LOGIC ---
-                
+
                 async function renderAndPaginate() {
                     try {
                         // 1. 处理\n符号，将其转换为实际换行
-                        const processedMarkdown = state.markdown.replace(/\\n/g, '\n');
-                        
+                        let processedMarkdown = state.markdown.replace(/\\n/g, '\n');
+                        // 修复 marked.js 对含标点字符加粗文本的解析问题
+                        // 例如 **巨星农牧（603477）**的 → 在闭合**前插入零宽空格使解析器正确识别
+                        processedMarkdown = processedMarkdown.replace(/\*\*(.+?)\*\*/g, '**$1\u200B**');
+
                         // 2. Parse Markdown to HTML
                         const rawHtml = marked.parse(processedMarkdown);
-                        
+
                         // 2. Style the hidden renderer for measurement
                         hiddenRenderer.className = `rendered-content`;
                         hiddenRenderer.style.padding = `${state.padding}px`;
                         hiddenRenderer.style.fontSize = `${state.fontSize}px`;
                         hiddenRenderer.style.fontFamily = state.fontFamily;
                         hiddenRenderer.innerHTML = rawHtml;
-                        
+
                         // Clear previous preview
                         previewArea.innerHTML = '';
-                        
+
                         const pageHeight = 440; // Fixed page height
                         const contentHeight = pageHeight - (state.padding * 2);
                         // 无水印时内容可以填满更多页面空间
@@ -516,7 +585,7 @@ function generatePages(markdown) {
                             currentPageDiv = document.createElement('div');
                             currentPageDiv.className = 'preview-page';
                             currentPageDiv.style.position = 'relative';
-                            
+
                             pageContentDiv = document.createElement('div');
                             pageContentDiv.className = 'rendered-content preview-page-content';
                             pageContentDiv.style.padding = `${state.padding}px`;
@@ -547,17 +616,17 @@ function generatePages(markdown) {
                             }
 
                             applyTheme(currentPageDiv, pageContentDiv);
-                            
+
                             currentPageDiv.appendChild(pageContentDiv);
                             previewArea.appendChild(currentPageDiv);
-                            
+
                             console.log(`Created new page. Content height: ${contentHeight}px, Page height: ${pageHeight}px, Padding: ${state.padding}px`);
                         }
 
                         // 智能分页算法 - 保持内容连贯性
                         createNewPage();
                         const elements = Array.from(hiddenRenderer.children);
-                        
+
                         console.log('Total elements:', elements.length);
                         elements.forEach((el, i) => {
                             const text = el.textContent?.trim() || '';
@@ -580,7 +649,7 @@ function generatePages(markdown) {
                                 tempContainer.style.padding = '12px';
                                 tempContainer.style.fontFamily = state.fontFamily;
                                 tempContainer.style.fontSize = state.fontSize + 'px';
-                                
+
                                 // 克隆表格并设置样式
                                 const clonedTable = tableElement.cloneNode(true);
                                 clonedTable.style.width = 'auto';
@@ -588,7 +657,7 @@ function generatePages(markdown) {
                                 clonedTable.style.borderCollapse = 'collapse';
                                 clonedTable.style.border = '1px solid #ccc';
                                 clonedTable.style.backgroundColor = '#fff';
-                                
+
                                 // 设置单元格样式 - 居中显示，字体放大
                                 clonedTable.querySelectorAll('th, td').forEach(cell => {
                                     cell.style.border = '1px solid #ddd';
@@ -599,16 +668,16 @@ function generatePages(markdown) {
                                     cell.style.maxWidth = 'none';
                                     cell.style.fontSize = state.fontSize * 1.1 + 'px';  // 字体放大10%
                                 });
-                                
+
                                 clonedTable.querySelectorAll('th').forEach(th => {
                                     th.style.fontWeight = 'bold';
                                     th.style.backgroundColor = '#f5f5f5';
                                     th.style.color = '#333';
                                 });
-                                
+
                                 tempContainer.appendChild(clonedTable);
                                 document.body.appendChild(tempContainer);
-                                
+
                                 // 使用html2canvas转换为图片
                                 const canvas = await html2canvas(tempContainer, {
                                     backgroundColor: 'white',
@@ -616,10 +685,10 @@ function generatePages(markdown) {
                                     useCORS: true,
                                     allowTaint: true
                                 });
-                                
+
                                 // 清理临时容器
                                 document.body.removeChild(tempContainer);
-                                
+
                                 // 创建图片元素
                                 const img = document.createElement('img');
                                 img.src = canvas.toDataURL('image/png');
@@ -629,7 +698,7 @@ function generatePages(markdown) {
                                 img.style.borderRadius = '4px';
                                 img.style.display = 'block';
                                 img.style.margin = '12px auto';
-                                
+
                                 return img;
                             } catch (error) {
                                 console.error('转换表格为图片失败:', error);
@@ -679,11 +748,11 @@ function generatePages(markdown) {
 
                             // 过滤空元素
                             const textContent = element.textContent?.trim() || '';
-                            const hasContent = textContent.length > 0 || 
-                                             element.tagName === 'HR' || 
-                                             element.tagName === 'IMG' ||
-                                             element.tagName === 'BR' ||
-                                             element.querySelector('img, hr, br');
+                            const hasContent = textContent.length > 0 ||
+                                element.tagName === 'HR' ||
+                                element.tagName === 'IMG' ||
+                                element.tagName === 'BR' ||
+                                element.querySelector('img, hr, br');
 
                             if (!hasContent) {
                                 console.log(`Skipping empty element ${elementIndex}:`, element.tagName);
@@ -989,7 +1058,7 @@ function generatePages(markdown) {
                         // 遍历所有元素进行分页（支持异步处理）
                         for (let i = 0; i < elements.length; i++) {
                             const element = elements[i];
-                            
+
                             // 特殊处理列表元素
                             if (element.tagName === 'UL' || element.tagName === 'OL') {
                                 await processListElement(element, i);
@@ -997,7 +1066,7 @@ function generatePages(markdown) {
                                 await processElement(element, i);
                             }
                         }
-                        
+
                         // 调整最后一页的高度以适应实际内容
                         if (pageContentDiv && pageContentDiv.children.length > 0) {
                             const actualHeight = pageContentDiv.scrollHeight;
@@ -1010,7 +1079,7 @@ function generatePages(markdown) {
                                 console.log(`Adjusted last page height to ${minRequiredHeight}px (content: ${actualHeight}px)`);
                             }
                         }
-                        
+
                         // 在所有内容添加完成后，对每个页面重新应用主题样式
                         console.log('Applying theme to all pages after content is added');
                         const allPages = previewArea.querySelectorAll('.preview-page');
@@ -1026,7 +1095,7 @@ function generatePages(markdown) {
                     }
                 }
 
-                
+
 
                 function applyTheme(pageContainer, contentContainer) {
                     console.log('applyTheme called with theme:', state.theme);
@@ -1041,41 +1110,41 @@ function generatePages(markdown) {
                     const strongColor = currentTheme.strongColor;
                     const linkColor = currentTheme.linkColor;
                     const blockquoteStyle = currentTheme.blockquoteStyle;
-                    
+
                     pageContainer.style.backgroundColor = pageBg;
                     contentContainer.style.color = textColor;
-                    
+
                     // H1-H6 标题样式 - 使用主题的标题颜色
                     contentContainer.querySelectorAll('h1').forEach(h1 => {
                         h1.style.setProperty('color', headingColor, 'important');
                         // h1的其他样式保持CSS默认，不需要重复设置
                     });
-                    
+
                     contentContainer.querySelectorAll('h2').forEach(h2 => {
                         h2.style.setProperty('color', headingColor, 'important');
                         // h2的其他样式保持CSS默认，不需要重复设置
                     });
-                    
+
                     contentContainer.querySelectorAll('h3').forEach(h3 => {
                         h3.style.setProperty('color', headingColor, 'important');
                         // h3的其他样式保持CSS默认，不需要重复设置
                     });
-                    
+
                     contentContainer.querySelectorAll('h4').forEach(h4 => {
                         h4.style.setProperty('color', headingColor, 'important');
                         // h4的其他样式保持CSS默认，不需要重复设置
                     });
-                    
+
                     contentContainer.querySelectorAll('h5').forEach(h5 => {
                         h5.style.setProperty('color', headingColor, 'important');
                         // h5的其他样式保持CSS默认，不需要重复设置
                     });
-                    
+
                     contentContainer.querySelectorAll('h6').forEach(h6 => {
                         h6.style.setProperty('color', headingColor, 'important');
                         // h6的其他样式保持CSS默认，不需要重复设置
                     });
-                    
+
                     // 引用块样式 - 使用主题的引用块样式
                     contentContainer.querySelectorAll('blockquote').forEach(bq => {
                         bq.style.setProperty('background', blockquoteStyle.background, 'important');
@@ -1085,7 +1154,7 @@ function generatePages(markdown) {
                         bq.style.padding = '0.6em';
                         bq.style.borderRadius = '0 0 0.6em 0.6em';
                         bq.style.margin = '0.5em 0';
-                        
+
                         // 引用块内的段落样式
                         bq.querySelectorAll('p').forEach(p => {
                             p.style.setProperty('color', blockquoteStyle.color, 'important');
@@ -1094,13 +1163,13 @@ function generatePages(markdown) {
                             p.style.letterSpacing = 'normal';
                         });
                     });
-                    
+
                     // 加粗文字样式 - 使用主题的加粗颜色
                     contentContainer.querySelectorAll('strong').forEach(strong => {
                         strong.style.setProperty('color', strongColor, 'important');
                         strong.style.fontWeight = 'bold';
                     });
-                    
+
                     // 链接样式 - 使用主题的链接颜色
                     contentContainer.querySelectorAll('a').forEach(link => {
                         link.style.setProperty('color', linkColor, 'important');
@@ -1113,25 +1182,25 @@ function generatePages(markdown) {
                         em.style.setProperty('color', strongColor, 'important');
                         em.style.letterSpacing = '0.3em';
                     });
-                    
+
                     // 通用样式
                     contentContainer.querySelectorAll('th').forEach(th => {
                         th.style.backgroundColor = codeBackground;
                         th.style.color = textColor;
                         th.style.borderColor = borderColor;
                     });
-                    
+
                     contentContainer.querySelectorAll('td').forEach(td => {
                         td.style.borderColor = borderColor;
                     });
-                    
+
                     contentContainer.querySelectorAll('code:not(pre code)').forEach(code => {
                         code.style.backgroundColor = codeBackground;
                         code.style.color = textColor;
                         code.style.padding = '2px 4px';
                         code.style.borderRadius = '3px';
                     });
-                    
+
                     contentContainer.querySelectorAll('hr').forEach(hr => {
                         hr.style.borderColor = borderColor;
                     });
@@ -1148,7 +1217,7 @@ function generatePages(markdown) {
                     state.theme = e.target.value;
                     renderAndPaginate();
                 });
-                
+
                 fontSelect.addEventListener('change', (e) => {
                     state.fontFamily = e.target.value;
                     renderAndPaginate();
@@ -1159,7 +1228,7 @@ function generatePages(markdown) {
                     paddingValue.textContent = state.padding;
                     renderAndPaginate();
                 });
-                
+
                 fontSizeSlider.addEventListener('input', (e) => {
                     state.fontSize = parseInt(e.target.value);
                     fontSizeValue.textContent = state.fontSize;
@@ -1173,7 +1242,9 @@ function generatePages(markdown) {
 
                 // --- COPY HTML LOGIC ---
                 copyHtmlBtn.addEventListener('click', async () => {
-                    const processedMarkdown = state.markdown.replace(/\\n/g, '\n');
+                    let processedMarkdown = state.markdown.replace(/\\n/g, '\n');
+                    // 修复 marked.js 对含标点字符加粗文本的解析问题
+                    processedMarkdown = processedMarkdown.replace(/\*\*(.+?)\*\*/g, '**$1\u200B**');
                     const rawHtml = marked.parse(processedMarkdown);
                     try {
                         const blob = new Blob([rawHtml], { type: 'text/html' });
@@ -1195,7 +1266,7 @@ function generatePages(markdown) {
                     loadingIndicator.classList.remove('hidden');
                     loadingIndicator.classList.add('flex');
                     exportBtn.disabled = true;
-                    
+
                     try {
                         const zip = new JSZip();
                         const pages = previewArea.querySelectorAll('.preview-page');
@@ -1204,18 +1275,18 @@ function generatePages(markdown) {
                             const page = pages[i];
                             try {
                                 console.log(`Exporting page ${i + 1} using dom-to-image with high quality`);
-                                
+
                                 // 获取页面的实际尺寸
                                 const pageWidth = page.offsetWidth;
                                 const pageHeight = page.offsetHeight;
-                                
+
                                 // 使用更高的缩放比例以提升清晰度（5倍）
                                 const scale = 5;
                                 const scaledWidth = pageWidth * scale;
                                 const scaledHeight = pageHeight * scale;
-                                
+
                                 console.log(`Page ${i + 1} original: ${pageWidth}x${pageHeight}, scaled: ${scaledWidth}x${scaledHeight}`);
-                                
+
                                 // 使用 dom-to-image 转换页面为高清图片
                                 const blob = await domtoimage.toBlob(page, {
                                     width: scaledWidth,
@@ -1229,9 +1300,9 @@ function generatePages(markdown) {
                                     quality: 1.0,
                                     cacheBust: true
                                 });
-                                
+
                                 console.log(`Page ${i + 1} exported successfully, size: ${(blob.size / 1024).toFixed(2)} KB`);
-                                
+
                                 zip.file(`page-${String(i + 1).padStart(2, '0')}.png`, blob);
                             } catch (error) {
                                 console.error('Error generating image for page', i, error);
@@ -1253,15 +1324,15 @@ function generatePages(markdown) {
                                 }
                             }
                         }
-                        
-                        const content = await zip.generateAsync({type: "blob"});
+
+                        const content = await zip.generateAsync({ type: "blob" });
                         const link = document.createElement('a');
                         link.href = URL.createObjectURL(content);
                         link.download = "markdown_pages.zip";
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
-                    } catch(error) {
+                    } catch (error) {
                         console.error('Error in export process', error);
                     } finally {
                         loadingIndicator.classList.add('hidden');
@@ -1269,24 +1340,24 @@ function generatePages(markdown) {
                         exportBtn.disabled = false;
                     }
                 });
-                
 
-                
+
+
                 // 设置主题选择器默认值
                 themeSelect.value = state.theme;
-                
+
                 // 设置字体选择器默认值
                 fontSelect.value = state.fontFamily;
-                
+
                 // 设置滑块默认值与state同步
                 paddingSlider.value = state.padding;
                 paddingValue.textContent = state.padding;
                 fontSizeSlider.value = state.fontSize;
                 fontSizeValue.textContent = state.fontSize;
-                
+
                 // 设置水印复选框默认值
                 watermarkCheckbox.checked = state.showWatermark;
-                
+
                 // Initial render
                 renderAndPaginate();
             };
@@ -1306,7 +1377,5 @@ function generatePages(markdown) {
         });
     </script>
 </body>
+
 </html>
-
-
-
