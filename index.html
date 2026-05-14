@@ -21,7 +21,7 @@
     <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Noto+Serif+SC:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=LXGW+WenKai&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;700&display=swap');
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
@@ -169,7 +169,7 @@
         }
 
         .rendered-content code {
-            color: rgb(271, 93, 108);
+            color: #e23d5f;
             background-color: #f3f4f6;
             padding: 0.2em 0.4em;
             border-radius: 3px;
@@ -318,10 +318,16 @@
                             <label for="theme-select" class="block text-sm font-medium text-gray-700 mb-2">主题风格</label>
                             <select id="theme-select"
                                 class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
-                                <option value="sunshine">小太阳（默认）</option>
-                                <option value="liuliu">六六</option>
-                                <option value="liuliu2">六六2</option>
-                                <option value="zoro">索隆</option>
+                                <option value="sunshine">001</option>
+                                <option value="liuliu">002</option>
+                                <option value="liuliu2">003</option>
+                                <option value="zoro">004</option>
+                                <option value="ocean">005</option>
+                                <option value="ink">006</option>
+                                <option value="neon">007</option>
+                                <option value="forest">008</option>
+                                <option value="newspaper">009</option>
+                                <option value="peach">010</option>
                             </select>
                         </div>
 
@@ -332,8 +338,12 @@
                                 <option
                                     value="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif">
                                     系统默认字体</option>
-                                <option value="'Inter', 'Noto Serif SC', sans-serif">现代无衬线</option>
+                                <option value="'Inter', 'Noto Sans SC', sans-serif">现代无衬线</option>
+                                <option value="'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif">清爽黑体</option>
                                 <option value="'Noto Serif SC', serif">典雅衬线体</option>
+                                <option value="'LXGW WenKai', 'Kaiti SC', 'STKaiti', serif">温润楷体</option>
+                                <option value="'Ma Shan Zheng', 'Noto Serif SC', serif">清晰手写体</option>
+                                <option value="'Courier New', 'SFMono-Regular', Consolas, monospace">代码等宽体</option>
                             </select>
                         </div>
                     </div>
@@ -388,13 +398,48 @@
             };
 
             const initApp = () => {
+                const languageAliases = {
+                    js: 'javascript',
+                    javascript: 'javascript',
+                    json: 'json',
+                    jsonc: 'json',
+                    ts: 'typescript',
+                    sh: 'bash',
+                    shell: 'bash',
+                    zsh: 'bash'
+                };
+
+                function normalizeCodeLanguage(infostring) {
+                    const rawLanguage = String(infostring || '').trim().split(/\s+/)[0].toLowerCase();
+                    return languageAliases[rawLanguage] || rawLanguage || 'plaintext';
+                }
+
+                function highlightCodeBlock(code, infostring) {
+                    const language = normalizeCodeLanguage(infostring);
+
+                    if (hljs.getLanguage(language)) {
+                        try {
+                            const highlighted = hljs.highlight(code, { language, ignoreIllegals: true }).value;
+                            if (highlighted.includes('<span')) {
+                                return { language, highlighted };
+                            }
+                        } catch (error) {
+                            console.warn(`Highlight failed for ${language}, fallback to auto detect.`, error);
+                        }
+                    }
+
+                    const autoResult = hljs.highlightAuto(code);
+                    return {
+                        language: autoResult.language || 'plaintext',
+                        highlighted: autoResult.value
+                    };
+                }
+
                 // Configure marked.js with highlight.js for syntax highlighting
                 marked.use({
                     renderer: {
                         code(code, infostring) {
-                            const lang = infostring || 'plaintext';
-                            const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-                            const highlighted = hljs.highlight(code, { language, ignoreIllegals: true }).value;
+                            const { language, highlighted } = highlightCodeBlock(code, infostring);
                             return `<pre><code class="hljs ${language}">${highlighted}</code></pre>`;
                         }
                     },
@@ -442,6 +487,17 @@ function generatePages(markdown) {
 }
 \`\`\`
 
+### JSON 示例
+
+\`\`\`json
+{
+  "title": "Markdown 智能分页切图工具",
+  "theme": "001",
+  "features": ["实时预览", "智能分页", "代码高亮"],
+  "watermark": true
+}
+\`\`\`
+
 ### 使用场景
 
 1. **知识分享**：将技术文档转换为图片，方便在社交媒体分享
@@ -468,70 +524,206 @@ function generatePages(markdown) {
 
                 markdownInput.value = defaultMarkdown;
 
-                // Define themes first - 为30+中年男性用户设计的配色方案
+                const fontFamilies = {
+                    system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif",
+                    modern: "'Inter', 'Noto Sans SC', sans-serif",
+                    sans: "'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
+                    serif: "'Noto Serif SC', serif",
+                    wenkai: "'LXGW WenKai', 'Kaiti SC', 'STKaiti', serif",
+                    handwriting: "'Ma Shan Zheng', 'Noto Serif SC', serif",
+                    mono: "'Courier New', 'SFMono-Regular', Consolas, monospace"
+                };
+
+                // Define themes first - 每个主题提供独立配色和默认字体
                 const themes = {
                     sunshine: {
-                        name: '小太阳',
-                        background: '#ffffff',
-                        text: '#3f2a1d',
-                        accent: '#ffb74d',
-                        border: '#ffe0b2',
-                        codeBackground: '#fff3e0',
-                        headingColor: '#f57c00',
-                        strongColor: '#ef6c00',
-                        linkColor: '#fb8c00',
+                        name: '001',
+                        fontFamily: fontFamilies.system,
+                        background: '#fffaf0',
+                        text: '#3a2416',
+                        accent: '#f59e0b',
+                        border: '#fed7aa',
+                        codeBackground: '#ffedd5',
+                        headingColor: '#d97706',
+                        strongColor: '#c2410c',
+                        linkColor: '#ea580c',
+                        tableStripe: '#fff7ed',
+                        tableHover: '#ffedd5',
                         blockquoteStyle: {
-                            background: 'linear-gradient(135deg, #ffd54f 0%, #ffb300 100%)',
-                            color: '#3f2a1d',
-                            boxShadow: 'rgba(255, 171, 64, 0.45) 0 0.5em 0.8em'
+                            background: 'linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)',
+                            color: '#3a2416',
+                            boxShadow: 'rgba(245, 158, 11, 0.35) 0 0.5em 0.8em'
                         }
                     },
                     liuliu: {
-                        name: '六六',
-                        background: '#eceff1',
-                        text: '#263238',
-                        accent: '#546e7a',
-                        border: '#b0bec5',
-                        codeBackground: '#cfd8dc',
-                        headingColor: '#37474f',
-                        strongColor: '#1565c0',  // 商务蓝，专业可靠
-                        linkColor: '#0d47a1',    // 深蓝色
+                        name: '002',
+                        fontFamily: fontFamilies.sans,
+                        background: '#f1f5f9',
+                        text: '#1e293b',
+                        accent: '#475569',
+                        border: '#cbd5e1',
+                        codeBackground: '#e2e8f0',
+                        headingColor: '#334155',
+                        strongColor: '#1d4ed8',
+                        linkColor: '#2563eb',
+                        tableStripe: '#f8fafc',
+                        tableHover: '#e2e8f0',
                         blockquoteStyle: {
-                            background: 'linear-gradient(135deg, #455a64 0%, #546e7a 100%)',
-                            color: '#eceff1',
-                            boxShadow: '#78909c 0 0.5em 0.8em'
+                            background: 'linear-gradient(135deg, #334155 0%, #64748b 100%)',
+                            color: '#f8fafc',
+                            boxShadow: 'rgba(100, 116, 139, 0.38) 0 0.5em 0.8em'
                         }
                     },
                     liuliu2: {
-                        name: '六六2',
-                        background: '#f5f5f0',  // 温暖的米白色背景
-                        text: '#3e3e3e',        // 深灰色文字
-                        accent: '#8b7355',      // 沉稳的褐色强调
-                        border: '#d4c5b9',      // 柔和的褐色边框
-                        codeBackground: '#ebe8e1',  // 浅米色代码背景
-                        headingColor: '#5a4a3a',    // 深褐色标题
-                        strongColor: '#c1440e',     // 暖橙红色加粗，与褐色主题形成对比
-                        linkColor: '#a23a0a',       // 深橙色链接
+                        name: '003',
+                        fontFamily: fontFamilies.serif,
+                        background: '#f7f3ec',
+                        text: '#34261f',
+                        accent: '#7c5f45',
+                        border: '#d8c7b6',
+                        codeBackground: '#eee4d8',
+                        headingColor: '#5f4633',
+                        strongColor: '#b45309',
+                        linkColor: '#92400e',
+                        tableStripe: '#fbf7f0',
+                        tableHover: '#efe3d2',
                         blockquoteStyle: {
-                            background: 'linear-gradient(135deg, #6b5d4f 0%, #8b7355 100%)',
-                            color: '#f5f5f0',
-                            boxShadow: '#9d8b73 0 0.5em 0.8em'
+                            background: 'linear-gradient(135deg, #6f5238 0%, #9a7656 100%)',
+                            color: '#fffaf0',
+                            boxShadow: 'rgba(124, 95, 69, 0.36) 0 0.5em 0.8em'
                         }
                     },
                     zoro: {
-                        name: '索隆',
-                        background: '#263238',
-                        text: '#cfd8dc',
-                        accent: '#78909c',
-                        border: '#455a64',
-                        codeBackground: '#37474f',
-                        headingColor: '#90a4ae',
-                        strongColor: '#ffa726',  // 温暖橙色，护眼醒目
-                        linkColor: '#ff9800',    // 橙色
+                        name: '004',
+                        fontFamily: fontFamilies.modern,
+                        background: '#111827',
+                        text: '#d1d5db',
+                        accent: '#6b7280',
+                        border: '#374151',
+                        codeBackground: '#1f2937',
+                        headingColor: '#9ca3af',
+                        strongColor: '#f59e0b',
+                        linkColor: '#fbbf24',
+                        tableStripe: '#182235',
+                        tableHover: '#243044',
                         blockquoteStyle: {
-                            background: 'linear-gradient(135deg, #1c313a 0%, #263238 100%)',
-                            color: '#b0bec5',
-                            boxShadow: '#455a64 0 0.4em 0.6em'
+                            background: 'linear-gradient(135deg, #0f172a 0%, #374151 100%)',
+                            color: '#e5e7eb',
+                            boxShadow: 'rgba(75, 85, 99, 0.42) 0 0.4em 0.6em'
+                        }
+                    },
+                    ocean: {
+                        name: '005',
+                        fontFamily: fontFamilies.sans,
+                        background: '#eef8ff',
+                        text: '#123047',
+                        accent: '#0ea5e9',
+                        border: '#bae6fd',
+                        codeBackground: '#dff3ff',
+                        headingColor: '#0369a1',
+                        strongColor: '#0f766e',
+                        linkColor: '#0284c7',
+                        tableStripe: '#f5fbff',
+                        tableHover: '#dff3ff',
+                        blockquoteStyle: {
+                            background: 'linear-gradient(135deg, #38bdf8 0%, #0f766e 100%)',
+                            color: '#f0fdfa',
+                            boxShadow: 'rgba(14, 165, 233, 0.32) 0 0.5em 0.8em'
+                        }
+                    },
+                    ink: {
+                        name: '006',
+                        fontFamily: fontFamilies.wenkai,
+                        background: '#fbfaf5',
+                        text: '#26221d',
+                        accent: '#2f3a33',
+                        border: '#d8d2c4',
+                        codeBackground: '#f0ede5',
+                        headingColor: '#1f2a24',
+                        strongColor: '#8a2d2b',
+                        linkColor: '#5b5f2f',
+                        tableStripe: '#f6f2e8',
+                        tableHover: '#ebe4d4',
+                        blockquoteStyle: {
+                            background: 'linear-gradient(135deg, #2f3a33 0%, #687267 100%)',
+                            color: '#fbfaf5',
+                            boxShadow: 'rgba(47, 58, 51, 0.28) 0 0.5em 0.8em'
+                        }
+                    },
+                    neon: {
+                        name: '007',
+                        fontFamily: fontFamilies.mono,
+                        background: '#090d1f',
+                        text: '#dbeafe',
+                        accent: '#22d3ee',
+                        border: '#1e3a8a',
+                        codeBackground: '#111827',
+                        headingColor: '#67e8f9',
+                        strongColor: '#f472b6',
+                        linkColor: '#a78bfa',
+                        tableStripe: '#0f1730',
+                        tableHover: '#172554',
+                        blockquoteStyle: {
+                            background: 'linear-gradient(135deg, #0891b2 0%, #7c3aed 100%)',
+                            color: '#f8fafc',
+                            boxShadow: 'rgba(34, 211, 238, 0.32) 0 0.5em 0.8em'
+                        }
+                    },
+                    forest: {
+                        name: '008',
+                        fontFamily: fontFamilies.wenkai,
+                        background: '#f4fbf6',
+                        text: '#1f3528',
+                        accent: '#16a34a',
+                        border: '#bbf7d0',
+                        codeBackground: '#dcfce7',
+                        headingColor: '#166534',
+                        strongColor: '#b45309',
+                        linkColor: '#15803d',
+                        tableStripe: '#f0fdf4',
+                        tableHover: '#dcfce7',
+                        blockquoteStyle: {
+                            background: 'linear-gradient(135deg, #15803d 0%, #84cc16 100%)',
+                            color: '#f7fee7',
+                            boxShadow: 'rgba(22, 163, 74, 0.28) 0 0.5em 0.8em'
+                        }
+                    },
+                    newspaper: {
+                        name: '009',
+                        fontFamily: fontFamilies.handwriting,
+                        background: '#fafafa',
+                        text: '#202020',
+                        accent: '#525252',
+                        border: '#d4d4d4',
+                        codeBackground: '#eeeeee',
+                        headingColor: '#111111',
+                        strongColor: '#7f1d1d',
+                        linkColor: '#404040',
+                        tableStripe: '#f5f5f5',
+                        tableHover: '#e5e5e5',
+                        blockquoteStyle: {
+                            background: 'linear-gradient(135deg, #262626 0%, #737373 100%)',
+                            color: '#ffffff',
+                            boxShadow: 'rgba(38, 38, 38, 0.24) 0 0.5em 0.8em'
+                        }
+                    },
+                    peach: {
+                        name: '010',
+                        fontFamily: fontFamilies.modern,
+                        background: '#fff7f3',
+                        text: '#3f2522',
+                        accent: '#fb7185',
+                        border: '#fecdd3',
+                        codeBackground: '#ffe4e6',
+                        headingColor: '#be123c',
+                        strongColor: '#c2410c',
+                        linkColor: '#e11d48',
+                        tableStripe: '#fff1f2',
+                        tableHover: '#ffe4e6',
+                        blockquoteStyle: {
+                            background: 'linear-gradient(135deg, #fb7185 0%, #f97316 100%)',
+                            color: '#fff7ed',
+                            boxShadow: 'rgba(251, 113, 133, 0.32) 0 0.5em 0.8em'
                         }
                     }
                 };
@@ -542,7 +734,7 @@ function generatePages(markdown) {
                 const state = {
                     markdown: markdownInput.value,
                     theme: 'sunshine',
-                    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif",
+                    fontFamily: themes.sunshine.fontFamily,
                     padding: 15,
                     fontSize: 13,
                     showWatermark: true,
@@ -1110,8 +1302,12 @@ function generatePages(markdown) {
                     const strongColor = currentTheme.strongColor;
                     const linkColor = currentTheme.linkColor;
                     const blockquoteStyle = currentTheme.blockquoteStyle;
+                    const tableStripe = currentTheme.tableStripe || codeBackground;
+                    const tableHover = currentTheme.tableHover || borderColor;
 
                     pageContainer.style.backgroundColor = pageBg;
+                    pageContainer.style.border = `1px solid ${borderColor}`;
+                    pageContainer.style.boxShadow = `0 8px 24px ${borderColor}66`;
                     contentContainer.style.color = textColor;
 
                     // H1-H6 标题样式 - 使用主题的标题颜色
@@ -1194,6 +1390,16 @@ function generatePages(markdown) {
                         td.style.borderColor = borderColor;
                     });
 
+                    contentContainer.querySelectorAll('tbody tr').forEach((tr, index) => {
+                        tr.style.backgroundColor = index % 2 === 0 ? pageBg : tableStripe;
+                        tr.onmouseenter = () => {
+                            tr.style.backgroundColor = tableHover;
+                        };
+                        tr.onmouseleave = () => {
+                            tr.style.backgroundColor = index % 2 === 0 ? pageBg : tableStripe;
+                        };
+                    });
+
                     contentContainer.querySelectorAll('code:not(pre code)').forEach(code => {
                         code.style.backgroundColor = codeBackground;
                         code.style.color = textColor;
@@ -1203,6 +1409,7 @@ function generatePages(markdown) {
 
                     contentContainer.querySelectorAll('hr').forEach(hr => {
                         hr.style.borderColor = borderColor;
+                        hr.style.backgroundImage = `linear-gradient(to right, transparent, ${accentColor}, transparent)`;
                     });
                 }
 
@@ -1215,6 +1422,9 @@ function generatePages(markdown) {
 
                 themeSelect.addEventListener('change', (e) => {
                     state.theme = e.target.value;
+                    const selectedTheme = themes[state.theme] || themes.sunshine;
+                    state.fontFamily = selectedTheme.fontFamily;
+                    fontSelect.value = state.fontFamily;
                     renderAndPaginate();
                 });
 
