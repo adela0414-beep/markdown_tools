@@ -46,6 +46,44 @@
             overflow: visible;
             overflow-wrap: break-word;
             line-break: strict;
+            position: relative;
+            z-index: 1;
+        }
+
+        .preview-page-watermark {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            user-select: none;
+            z-index: 0;
+        }
+
+        .preview-page-watermark-pattern {
+            position: absolute;
+            top: -52px;
+            left: -112px;
+            width: 560px;
+            height: 560px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-auto-rows: 150px;
+            gap: 28px 34px;
+            transform: rotate(-18deg);
+        }
+
+        .preview-page-watermark-text {
+            align-self: center;
+            justify-self: center;
+            width: 172px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            line-height: 1.45;
+            letter-spacing: 0.06em;
+            text-align: center;
+            white-space: normal;
+            text-wrap: balance;
         }
 
         .rendered-content h1 {
@@ -728,7 +766,49 @@ function generatePages(markdown) {
                     }
                 };
 
+                const watermarkText = '打开「口袋分析师」微信小程序搜索公司名看完整报告';
 
+                function hexToRgba(hex, alpha) {
+                    if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
+                        return hex;
+                    }
+
+                    let value = hex.slice(1);
+                    if (value.length === 3) {
+                        value = value.split('').map(char => char + char).join('');
+                    }
+
+                    const intValue = parseInt(value, 16);
+                    const red = (intValue >> 16) & 255;
+                    const green = (intValue >> 8) & 255;
+                    const blue = intValue & 255;
+                    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+                }
+
+                function createWatermarkLayer() {
+                    const layer = document.createElement('div');
+                    layer.className = 'preview-page-watermark';
+
+                    const pattern = document.createElement('div');
+                    pattern.className = 'preview-page-watermark-pattern';
+
+                    Array.from({ length: 9 }).forEach(() => {
+                        const item = document.createElement('div');
+                        item.className = 'preview-page-watermark-text';
+                        item.textContent = watermarkText;
+                        pattern.appendChild(item);
+                    });
+
+                    layer.appendChild(pattern);
+                    return layer;
+                }
+
+                function updateWatermarkTheme(pageContainer, accentColor) {
+                    const opacity = state.theme === 'zoro' ? 0.16 : 0.1;
+                    pageContainer.querySelectorAll('.preview-page-watermark-text').forEach(item => {
+                        item.style.color = hexToRgba(accentColor, opacity);
+                    });
+                }
 
                 // App State
                 const state = {
@@ -767,8 +847,7 @@ function generatePages(markdown) {
 
                         const pageHeight = 440; // Fixed page height
                         const contentHeight = pageHeight - (state.padding * 2);
-                        // 无水印时内容可以填满更多页面空间
-                        const overflowTolerance = state.showWatermark ? 20 : 35;
+                        const overflowTolerance = 35;
 
                         let currentPageDiv;
                         let pageContentDiv;
@@ -789,22 +868,9 @@ function generatePages(markdown) {
                             pageContentDiv.style.wordWrap = 'break-word';
                             pageContentDiv.style.hyphens = 'auto';
 
-                            // 创建水印元素（如果启用）
+                            // 创建背景水印元素（如果启用）
                             if (state.showWatermark) {
-                                const watermark = document.createElement('div');
-                                watermark.textContent = '打开「口_袋_分_析_师」微信小程序搜索公司名看完整报告';
-                                watermark.style.position = 'absolute';
-                                watermark.style.bottom = '8px';
-                                watermark.style.right = '12px';
-                                watermark.style.fontSize = '11px';
-                                watermark.style.color = '#28A745';
-                                watermark.style.opacity = '0.9';
-                                watermark.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-                                watermark.style.fontWeight = 'bold';
-                                watermark.style.pointerEvents = 'none';
-                                watermark.style.userSelect = 'none';
-                                watermark.style.zIndex = '1000';
-                                currentPageDiv.appendChild(watermark);
+                                currentPageDiv.appendChild(createWatermarkLayer());
                             }
 
                             applyTheme(currentPageDiv, pageContentDiv);
@@ -1309,6 +1375,7 @@ function generatePages(markdown) {
                     pageContainer.style.border = `1px solid ${borderColor}`;
                     pageContainer.style.boxShadow = `0 8px 24px ${borderColor}66`;
                     contentContainer.style.color = textColor;
+                    updateWatermarkTheme(pageContainer, accentColor);
 
                     // H1-H6 标题样式 - 使用主题的标题颜色
                     contentContainer.querySelectorAll('h1').forEach(h1 => {
