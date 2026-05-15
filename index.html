@@ -630,9 +630,9 @@ function generatePages(markdown) {
                     return layer;
                 }
 
-                function updateWatermarkTheme(pageContainer, headingColor, textColor) {
+                function updateWatermarkTheme(pageContainer, strongColor, textColor) {
                     pageContainer.querySelectorAll('.preview-page-watermark-text').forEach(item => {
-                        item.style.color = hexToRgba(headingColor, 1);
+                        item.style.color = hexToRgba(strongColor, 1);
                     });
                     pageContainer.querySelectorAll('.preview-page-watermark-dot').forEach(item => {
                         item.style.backgroundColor = hexToRgba(textColor, 1);
@@ -1200,7 +1200,7 @@ function generatePages(markdown) {
 
                     pageContainer.style.backgroundColor = pageBg;
                     contentContainer.style.color = textColor;
-                    updateWatermarkTheme(pageContainer, headingColor, textColor);
+                    updateWatermarkTheme(pageContainer, strongColor, textColor);
 
                     // H1-H6 标题样式 - 使用主题的标题颜色
                     contentContainer.querySelectorAll('h1').forEach(h1 => {
