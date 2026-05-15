@@ -52,38 +52,43 @@
 
         .preview-page-watermark {
             position: absolute;
-            inset: 0;
-            overflow: hidden;
+            left: 12px;
+            right: 12px;
+            bottom: 8px;
+            height: 34px;
             pointer-events: none;
             user-select: none;
-            z-index: 0;
+            z-index: 2;
         }
 
-        .preview-page-watermark-pattern {
+        .preview-page-watermark-mark {
             position: absolute;
-            top: -52px;
-            left: -112px;
-            width: 560px;
-            height: 560px;
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-auto-rows: 150px;
-            gap: 28px 34px;
-            transform: rotate(-18deg);
+            right: 0;
+            bottom: 0;
         }
 
         .preview-page-watermark-text {
-            align-self: center;
-            justify-self: center;
-            width: 172px;
+            position: relative;
+            z-index: 1;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
-            line-height: 1.45;
-            letter-spacing: 0.06em;
-            text-align: center;
-            white-space: normal;
-            text-wrap: balance;
+            line-height: 1.2;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .preview-page-watermark-dots {
+            position: absolute;
+            inset: -1px 0 0 0;
+            z-index: 2;
+        }
+
+        .preview-page-watermark-dot {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            border-radius: 999px;
         }
 
         .rendered-content h1 {
@@ -574,7 +579,7 @@ function generatePages(markdown) {
                     }
                 };
 
-                const watermarkText = '打开「口袋分析师」微信小程序搜索公司名看完整报告';
+                const watermarkText = '打开「口/袋/分/析/师」微信小程序搜索公司名看完整报告';
 
                 function hexToRgba(hex, alpha) {
                     if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
@@ -597,24 +602,40 @@ function generatePages(markdown) {
                     const layer = document.createElement('div');
                     layer.className = 'preview-page-watermark';
 
-                    const pattern = document.createElement('div');
-                    pattern.className = 'preview-page-watermark-pattern';
+                    const mark = document.createElement('div');
+                    mark.className = 'preview-page-watermark-mark';
 
-                    Array.from({ length: 9 }).forEach(() => {
-                        const item = document.createElement('div');
-                        item.className = 'preview-page-watermark-text';
-                        item.textContent = watermarkText;
-                        pattern.appendChild(item);
+                    const dots = document.createElement('div');
+                    dots.className = 'preview-page-watermark-dots';
+
+                    Array.from({ length: 72 }).forEach(() => {
+                        const dot = document.createElement('span');
+                        const size = Math.random() > 0.82 ? 3 : 2;
+                        dot.className = 'preview-page-watermark-dot';
+                        dot.style.left = `${Math.random() * 100}%`;
+                        dot.style.top = `${Math.random() * 100}%`;
+                        dot.style.width = `${size}px`;
+                        dot.style.height = `${size}px`;
+                        dot.style.opacity = '1';
+                        dots.appendChild(dot);
                     });
 
-                    layer.appendChild(pattern);
+                    const text = document.createElement('div');
+                    text.className = 'preview-page-watermark-text';
+                    text.textContent = watermarkText;
+
+                    mark.appendChild(text);
+                    mark.appendChild(dots);
+                    layer.appendChild(mark);
                     return layer;
                 }
 
-                function updateWatermarkTheme(pageContainer, accentColor) {
-                    const opacity = state.theme === 'zoro' ? 0.16 : 0.1;
+                function updateWatermarkTheme(pageContainer, accentColor, textColor) {
                     pageContainer.querySelectorAll('.preview-page-watermark-text').forEach(item => {
-                        item.style.color = hexToRgba(accentColor, opacity);
+                        item.style.color = hexToRgba(accentColor, 0.95);
+                    });
+                    pageContainer.querySelectorAll('.preview-page-watermark-dot').forEach(item => {
+                        item.style.backgroundColor = hexToRgba(textColor, 1);
                     });
                 }
 
@@ -655,7 +676,7 @@ function generatePages(markdown) {
 
                         const pageHeight = 440; // Fixed page height
                         const contentHeight = pageHeight - (state.padding * 2);
-                        const overflowTolerance = 35;
+                        const overflowTolerance = state.showWatermark ? 20 : 35;
 
                         let currentPageDiv;
                         let pageContentDiv;
@@ -676,7 +697,7 @@ function generatePages(markdown) {
                             pageContentDiv.style.wordWrap = 'break-word';
                             pageContentDiv.style.hyphens = 'auto';
 
-                            // 创建背景水印元素（如果启用）
+                            // 创建底部水印元素（如果启用）
                             if (state.showWatermark) {
                                 currentPageDiv.appendChild(createWatermarkLayer());
                             }
@@ -1179,7 +1200,7 @@ function generatePages(markdown) {
 
                     pageContainer.style.backgroundColor = pageBg;
                     contentContainer.style.color = textColor;
-                    updateWatermarkTheme(pageContainer, accentColor);
+                    updateWatermarkTheme(pageContainer, accentColor, textColor);
 
                     // H1-H6 标题样式 - 使用主题的标题颜色
                     contentContainer.querySelectorAll('h1').forEach(h1 => {
