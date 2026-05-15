@@ -65,6 +65,7 @@
             position: absolute;
             right: 0;
             bottom: 0;
+            max-width: 100%;
         }
 
         .preview-page-watermark-text {
@@ -76,6 +77,9 @@
             line-height: 1.2;
             text-align: right;
             white-space: nowrap;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .preview-page-watermark-dots {
@@ -411,11 +415,24 @@
 
                     <!-- 第三行：水印选项 -->
                     <div class="pt-3 border-t border-gray-200">
-                        <div class="flex items-center">
-                            <input id="watermark-checkbox" type="checkbox" checked
-                                class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer">
-                            <label for="watermark-checkbox"
-                                class="ml-2 block text-sm font-medium text-gray-700 cursor-pointer">显示水印</label>
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="flex items-center">
+                                <input id="watermark-checkbox" type="checkbox" checked
+                                    class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer">
+                                <label for="watermark-checkbox"
+                                    class="ml-2 block text-sm font-medium text-gray-700 cursor-pointer">显示水印</label>
+                            </div>
+                            <button id="toggle-watermark-text-btn" type="button"
+                                class="text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
+                                aria-expanded="false" aria-controls="watermark-text-panel">
+                                修改文案
+                            </button>
+                        </div>
+                        <div id="watermark-text-panel" class="hidden mt-3">
+                            <label for="watermark-text-input" class="block text-sm font-medium text-gray-700 mb-2">水印文案</label>
+                            <input id="watermark-text-input" type="text"
+                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
+                                autocomplete="off">
                         </div>
                     </div>
                 </div>
@@ -502,6 +519,9 @@
                 const fontSizeSlider = document.getElementById('font-size-slider');
                 const fontSizeValue = document.getElementById('font-size-value');
                 const watermarkCheckbox = document.getElementById('watermark-checkbox');
+                const toggleWatermarkTextBtn = document.getElementById('toggle-watermark-text-btn');
+                const watermarkTextPanel = document.getElementById('watermark-text-panel');
+                const watermarkTextInput = document.getElementById('watermark-text-input');
                 const copyHtmlBtn = document.getElementById('copy-html-btn');
                 const exportBtn = document.getElementById('export-zip-btn');
                 const loadingIndicator = document.getElementById('loading-indicator');
@@ -771,7 +791,7 @@ function generatePages(markdown) {
                     }
                 };
 
-                const watermarkText = '打开「口/袋/分/析/师」VX小程序搜索公司名看完整报告';
+                const defaultWatermarkText = '打开「口/袋/分/析/师」VX小程序搜索公司名看完整报告';
 
                 function hexToRgba(hex, alpha) {
                     if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
@@ -814,7 +834,7 @@ function generatePages(markdown) {
 
                     const text = document.createElement('div');
                     text.className = 'preview-page-watermark-text';
-                    text.textContent = watermarkText;
+                    text.textContent = state.watermarkText;
 
                     mark.appendChild(text);
                     mark.appendChild(dots);
@@ -839,6 +859,7 @@ function generatePages(markdown) {
                     padding: 15,
                     fontSize: 13,
                     showWatermark: true,
+                    watermarkText: defaultWatermarkText,
                 };
 
 
@@ -1538,6 +1559,21 @@ function generatePages(markdown) {
                     renderAndPaginate();
                 });
 
+                toggleWatermarkTextBtn.addEventListener('click', () => {
+                    const isHidden = watermarkTextPanel.classList.toggle('hidden');
+                    toggleWatermarkTextBtn.setAttribute('aria-expanded', String(!isHidden));
+                    toggleWatermarkTextBtn.textContent = isHidden ? '修改文案' : '收起文案';
+
+                    if (!isHidden) {
+                        watermarkTextInput.focus();
+                    }
+                });
+
+                watermarkTextInput.addEventListener('input', (e) => {
+                    state.watermarkText = e.target.value;
+                    renderAndPaginate();
+                });
+
                 // --- COPY HTML LOGIC ---
                 copyHtmlBtn.addEventListener('click', async () => {
                     let processedMarkdown = state.markdown.replace(/\\n/g, '\n');
@@ -1655,6 +1691,7 @@ function generatePages(markdown) {
 
                 // 设置水印复选框默认值
                 watermarkCheckbox.checked = state.showWatermark;
+                watermarkTextInput.value = state.watermarkText;
 
                 // Initial render
                 renderAndPaginate();
