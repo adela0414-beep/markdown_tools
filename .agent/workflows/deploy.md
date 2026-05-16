@@ -4,7 +4,7 @@ description: 部署 Markdown 切图工具到 Vercel 生产环境
 
 # 部署流程
 
-> ⚠️ **重要**：本项目不依赖 GitHub 推送自动触发 Vercel 部署，**必须手动执行部署命令**。
+> 本项目已连接 Vercel，推送到 GitHub 的 `main` 分支后会自动触发生产部署。
 
 ## 步骤
 
@@ -13,18 +13,13 @@ description: 部署 Markdown 切图工具到 Vercel 生产环境
 ```bash
 cd "/Users/liuyi/IdeaProjects/Markdown 切图工具"
 git add -A
-git commit -m "描述性的提交信息"
+git commit -m "fix: 中文提交标题" -m "主要改动：
+- 补充本次核心变更。
+- 说明影响范围和验证结果。"
 git push origin main
 ```
 
-// turbo
-2. 手动触发 Vercel 生产部署：
-
-```bash
-cd "/Users/liuyi/IdeaProjects/Markdown 切图工具" && vercel --prod
-```
-
-3. 等待部署完成，确认输出中包含 `✅ Production` 字样。
+2. 等待 Vercel 自动部署完成，并访问生产地址验证页面。
 
 ## 项目信息
 
