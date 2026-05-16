@@ -54,17 +54,18 @@
             position: absolute;
             left: 12px;
             right: 12px;
-            bottom: 8px;
-            height: 34px;
+            bottom: 4px;
+            height: 22px;
             pointer-events: none;
             user-select: none;
             z-index: 2;
+            overflow: visible;
         }
 
         .preview-page-watermark-mark {
             position: absolute;
             right: 0;
-            bottom: 0;
+            bottom: 3px;
             max-width: 100%;
         }
 
@@ -74,12 +75,14 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 11px;
             font-weight: 700;
-            line-height: 1.2;
+            line-height: 14px;
+            height: 18px;
+            padding-bottom: 3px;
             text-align: right;
             white-space: nowrap;
             max-width: 100%;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            overflow: visible;
+            text-overflow: clip;
         }
 
         .preview-page-watermark-dots {
@@ -919,8 +922,13 @@ function generatePages(markdown) {
                         previewArea.innerHTML = '';
 
                         const pageHeight = 440; // Fixed page height
-                        const contentHeight = pageHeight - (state.padding * 2);
-                        const overflowTolerance = state.showWatermark ? 20 : 35;
+                        const watermarkHeight = 22;
+                        const watermarkBottom = 4;
+                        const watermarkGap = 6;
+                        const watermarkSafeArea = state.showWatermark ? watermarkHeight + watermarkBottom + watermarkGap : 0;
+                        const contentHeight = pageHeight - (state.padding * 2) - watermarkSafeArea;
+                        // 无水印时内容可以填满更多页面空间
+                        const overflowTolerance = state.showWatermark ? 12 : 35;
 
                         let currentPageDiv;
                         let pageContentDiv;
@@ -935,7 +943,7 @@ function generatePages(markdown) {
                             pageContentDiv.style.padding = `${state.padding}px`;
                             pageContentDiv.style.fontSize = `${state.fontSize}px`;
                             pageContentDiv.style.fontFamily = state.fontFamily;
-                            pageContentDiv.style.minHeight = `${contentHeight}px`;
+                            pageContentDiv.style.minHeight = 'auto';
                             pageContentDiv.style.height = 'auto';
                             pageContentDiv.style.overflow = 'visible';
                             pageContentDiv.style.wordWrap = 'break-word';
@@ -1402,7 +1410,7 @@ function generatePages(markdown) {
                         // 调整最后一页的高度以适应实际内容
                         if (pageContentDiv && pageContentDiv.children.length > 0) {
                             const actualHeight = pageContentDiv.scrollHeight;
-                            const minRequiredHeight = actualHeight + (state.padding * 2);
+                            const minRequiredHeight = actualHeight + watermarkSafeArea;
                             if (minRequiredHeight < pageHeight) {
                                 pageContentDiv.style.height = `${actualHeight}px`;
                                 pageContentDiv.style.minHeight = 'auto';
