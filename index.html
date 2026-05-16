@@ -30,10 +30,11 @@
         }
 
         .preview-page {
+            box-sizing: border-box;
             width: 330px;
-            min-height: 440px;
+            height: 440px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            overflow: visible;
+            overflow: hidden;
             flex-shrink: 0;
             background-color: white;
             transition: all 0.2s ease-in-out;
@@ -398,20 +399,13 @@
                         </div>
                     </div>
 
-                    <!-- 第二行：滑块控件 -->
-                    <div class="grid grid-cols-2 gap-4 mb-4">
+                    <!-- 第二行：字体大小控件 -->
+                    <div class="mb-4">
                         <div>
                             <label for="font-size-slider" class="block text-sm font-medium text-gray-700 mb-2">
                                 字体大小: <span id="font-size-value" class="text-orange-600 font-semibold">13</span>px
                             </label>
                             <input id="font-size-slider" type="range" min="12" max="24" value="13"
-                                class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
-                        </div>
-                        <div>
-                            <label for="padding-slider" class="block text-sm font-medium text-gray-700 mb-2">
-                                页面边距: <span id="padding-value" class="text-orange-600 font-semibold">15</span>px
-                            </label>
-                            <input id="padding-slider" type="range" min="10" max="60" value="15"
                                 class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-500">
                         </div>
                     </div>
@@ -548,8 +542,6 @@
 
                 const themeSelect = document.getElementById('theme-select');
                 const fontSelect = document.getElementById('font-select');
-                const paddingSlider = document.getElementById('padding-slider');
-                const paddingValue = document.getElementById('padding-value');
                 const fontSizeSlider = document.getElementById('font-size-slider');
                 const fontSizeValue = document.getElementById('font-size-value');
                 const watermarkCheckbox = document.getElementById('watermark-checkbox');
@@ -926,9 +918,9 @@ function generatePages(markdown) {
                         const watermarkBottom = 4;
                         const watermarkGap = 2;
                         const watermarkSafeArea = state.showWatermark ? watermarkHeight + watermarkBottom + watermarkGap : 0;
-                        const contentHeight = pageHeight - watermarkSafeArea;
+                        const contentHeight = pageHeight - state.padding - watermarkSafeArea;
                         // 无水印时内容可以填满更多页面空间
-                        const overflowTolerance = state.showWatermark ? 18 : 35;
+                        const overflowTolerance = state.showWatermark ? 38 : 18;
 
                         let currentPageDiv;
                         let pageContentDiv;
@@ -1407,19 +1399,6 @@ function generatePages(markdown) {
                             }
                         }
 
-                        // 调整最后一页的高度以适应实际内容
-                        if (pageContentDiv && pageContentDiv.children.length > 0) {
-                            const actualHeight = pageContentDiv.scrollHeight;
-                            const minRequiredHeight = actualHeight + watermarkSafeArea;
-                            if (minRequiredHeight < pageHeight) {
-                                pageContentDiv.style.height = `${actualHeight}px`;
-                                pageContentDiv.style.minHeight = 'auto';
-                                pageContentDiv.style.maxHeight = 'none';
-                                currentPageDiv.style.height = `${minRequiredHeight}px`;
-                                console.log(`Adjusted last page height to ${minRequiredHeight}px (content: ${actualHeight}px)`);
-                            }
-                        }
-
                         // 在所有内容添加完成后，对每个页面重新应用主题样式
                         console.log('Applying theme to all pages after content is added');
                         const allPages = previewArea.querySelectorAll('.preview-page');
@@ -1582,12 +1561,6 @@ function generatePages(markdown) {
                     renderAndPaginate();
                 });
 
-                paddingSlider.addEventListener('input', (e) => {
-                    state.padding = parseInt(e.target.value);
-                    paddingValue.textContent = state.padding;
-                    renderAndPaginate();
-                });
-
                 fontSizeSlider.addEventListener('input', (e) => {
                     state.fontSize = parseInt(e.target.value);
                     fontSizeValue.textContent = state.fontSize;
@@ -1716,8 +1689,6 @@ function generatePages(markdown) {
                 fontSelect.value = state.fontFamily;
 
                 // 设置滑块默认值与state同步
-                paddingSlider.value = state.padding;
-                paddingValue.textContent = state.padding;
                 fontSizeSlider.value = state.fontSize;
                 fontSizeValue.textContent = state.fontSize;
 
