@@ -797,12 +797,42 @@ function generatePages(markdown) {
                         previewArea.innerHTML = '';
 
                         const pageHeight = 440; // Fixed page height
-                        const contentHeight = pageHeight - (state.padding * 2);
+                        const watermarkHeight = 18;
+                        const watermarkBottom = 6;
+                        const watermarkGap = 6;
+                        const watermarkSafeArea = state.showWatermark ? watermarkHeight + watermarkBottom + watermarkGap : 0;
+                        const contentHeight = pageHeight - (state.padding * 2) - watermarkSafeArea;
                         // 无水印时内容可以填满更多页面空间
-                        const overflowTolerance = state.showWatermark ? 20 : 35;
+                        const overflowTolerance = state.showWatermark ? 8 : 35;
 
                         let currentPageDiv;
                         let pageContentDiv;
+
+                        function createWatermark() {
+                            const watermark = document.createElement('div');
+                            watermark.textContent = '打开「口_袋_分_析_师」微信小程序搜索公司名看完整报告';
+                            watermark.className = 'page-watermark';
+                            watermark.style.boxSizing = 'border-box';
+                            watermark.style.position = 'absolute';
+                            watermark.style.left = '12px';
+                            watermark.style.right = '12px';
+                            watermark.style.bottom = `${watermarkBottom}px`;
+                            watermark.style.height = `${watermarkHeight}px`;
+                            watermark.style.paddingBottom = '3px';
+                            watermark.style.fontSize = '11px';
+                            watermark.style.lineHeight = '14px';
+                            watermark.style.color = '#8a1f1f';
+                            watermark.style.opacity = '0.9';
+                            watermark.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+                            watermark.style.fontWeight = 'bold';
+                            watermark.style.textAlign = 'right';
+                            watermark.style.whiteSpace = 'nowrap';
+                            watermark.style.overflow = 'visible';
+                            watermark.style.pointerEvents = 'none';
+                            watermark.style.userSelect = 'none';
+                            watermark.style.zIndex = '1000';
+                            return watermark;
+                        }
 
                         function createNewPage() {
                             currentPageDiv = document.createElement('div');
@@ -814,33 +844,18 @@ function generatePages(markdown) {
                             pageContentDiv.style.padding = `${state.padding}px`;
                             pageContentDiv.style.fontSize = `${state.fontSize}px`;
                             pageContentDiv.style.fontFamily = state.fontFamily;
-                            pageContentDiv.style.minHeight = `${contentHeight}px`;
+                            pageContentDiv.style.minHeight = 'auto';
                             pageContentDiv.style.height = 'auto';
                             pageContentDiv.style.overflow = 'visible';
                             pageContentDiv.style.wordWrap = 'break-word';
                             pageContentDiv.style.hyphens = 'auto';
 
-                            // 创建水印元素（如果启用）
-                            if (state.showWatermark) {
-                                const watermark = document.createElement('div');
-                                watermark.textContent = '打开「口_袋_分_析_师」微信小程序搜索公司名看完整报告';
-                                watermark.style.position = 'absolute';
-                                watermark.style.bottom = '8px';
-                                watermark.style.right = '12px';
-                                watermark.style.fontSize = '11px';
-                                watermark.style.color = '#28A745';
-                                watermark.style.opacity = '0.9';
-                                watermark.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-                                watermark.style.fontWeight = 'bold';
-                                watermark.style.pointerEvents = 'none';
-                                watermark.style.userSelect = 'none';
-                                watermark.style.zIndex = '1000';
-                                currentPageDiv.appendChild(watermark);
-                            }
-
                             applyTheme(currentPageDiv, pageContentDiv);
 
                             currentPageDiv.appendChild(pageContentDiv);
+                            if (state.showWatermark) {
+                                currentPageDiv.appendChild(createWatermark());
+                            }
                             previewArea.appendChild(currentPageDiv);
 
                             console.log(`Created new page. Content height: ${contentHeight}px, Page height: ${pageHeight}px, Padding: ${state.padding}px`);
@@ -1294,7 +1309,7 @@ function generatePages(markdown) {
                         // 调整最后一页的高度以适应实际内容
                         if (pageContentDiv && pageContentDiv.children.length > 0) {
                             const actualHeight = pageContentDiv.scrollHeight;
-                            const minRequiredHeight = actualHeight + (state.padding * 2);
+                            const minRequiredHeight = actualHeight + watermarkSafeArea;
                             if (minRequiredHeight < pageHeight) {
                                 pageContentDiv.style.height = `${actualHeight}px`;
                                 pageContentDiv.style.minHeight = 'auto';
