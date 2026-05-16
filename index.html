@@ -435,6 +435,37 @@
                     };
                 }
 
+                function getPrimaryFontFamily(fontFamily) {
+                    return String(fontFamily || '')
+                        .split(',')[0]
+                        .trim()
+                        .replace(/^['"]|['"]$/g, '');
+                }
+
+                function waitForNextFrame() {
+                    return new Promise(resolve => requestAnimationFrame(resolve));
+                }
+
+                async function waitForActiveFonts() {
+                    if (!document.fonts) return;
+
+                    const primaryFont = getPrimaryFontFamily(state.fontFamily);
+                    if (primaryFont) {
+                        try {
+                            await Promise.all([
+                                document.fonts.load(`400 ${state.fontSize}px "${primaryFont}"`),
+                                document.fonts.load(`700 ${state.fontSize}px "${primaryFont}"`)
+                            ]);
+                        } catch (error) {
+                            console.warn(`Font load check failed for ${primaryFont}.`, error);
+                        }
+                    }
+
+                    await document.fonts.ready;
+                    await waitForNextFrame();
+                    await waitForNextFrame();
+                }
+
                 // Configure marked.js with highlight.js for syntax highlighting
                 marked.use({
                     renderer: {
@@ -690,7 +721,7 @@ function generatePages(markdown) {
                     },
                     newspaper: {
                         name: '009',
-                        fontFamily: fontFamilies.handwriting,
+                        fontFamily: fontFamilies.wenkai,
                         background: '#fafafa',
                         text: '#202020',
                         accent: '#525252',
@@ -869,6 +900,7 @@ function generatePages(markdown) {
 
                                 tempContainer.appendChild(clonedTable);
                                 document.body.appendChild(tempContainer);
+                                await waitForActiveFonts();
 
                                 // 使用html2canvas转换为图片
                                 const canvas = await html2canvas(tempContainer, {
@@ -1480,53 +1512,45 @@ function generatePages(markdown) {
                     try {
                         const zip = new JSZip();
                         const pages = previewArea.querySelectorAll('.preview-page');
+                        await waitForActiveFonts();
 
                         for (let i = 0; i < pages.length; i++) {
                             const page = pages[i];
                             try {
-                                console.log(`Exporting page ${i + 1} using dom-to-image with high quality`);
+                                console.log(`Exporting page ${i + 1} using html2canvas with active fonts`);
 
-                                // 获取页面的实际尺寸
-                                const pageWidth = page.offsetWidth;
-                                const pageHeight = page.offsetHeight;
-
-                                // 使用更高的缩放比例以提升清晰度（5倍）
-                                const scale = 5;
-                                const scaledWidth = pageWidth * scale;
-                                const scaledHeight = pageHeight * scale;
-
-                                console.log(`Page ${i + 1} original: ${pageWidth}x${pageHeight}, scaled: ${scaledWidth}x${scaledHeight}`);
-
-                                // 使用 dom-to-image 转换页面为高清图片
-                                const blob = await domtoimage.toBlob(page, {
-                                    width: scaledWidth,
-                                    height: scaledHeight,
-                                    style: {
-                                        transform: `scale(${scale})`,
-                                        transformOrigin: 'top left',
-                                        width: pageWidth + 'px',
-                                        height: pageHeight + 'px'
-                                    },
-                                    quality: 1.0,
-                                    cacheBust: true
+                                const canvas = await html2canvas(page, {
+                                    scale: 5,
+                                    useCORS: true,
+                                    allowTaint: true,
+                                    logging: false,
+                                    backgroundColor: window.getComputedStyle(page).backgroundColor
                                 });
+                                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
 
                                 console.log(`Page ${i + 1} exported successfully, size: ${(blob.size / 1024).toFixed(2)} KB`);
 
                                 zip.file(`page-${String(i + 1).padStart(2, '0')}.png`, blob);
                             } catch (error) {
                                 console.error('Error generating image for page', i, error);
-                                // 如果 dom-to-image 失败，尝试回退到 html2canvas
+                                // 如果 html2canvas 失败，尝试回退到 dom-to-image
                                 try {
-                                    console.log(`Falling back to html2canvas for page ${i + 1}`);
-                                    const canvas = await html2canvas(page, {
-                                        scale: 5,
-                                        useCORS: true,
-                                        allowTaint: true,
-                                        logging: false,
-                                        backgroundColor: window.getComputedStyle(page).backgroundColor
+                                    console.log(`Falling back to dom-to-image for page ${i + 1}`);
+                                    const pageWidth = page.offsetWidth;
+                                    const pageHeight = page.offsetHeight;
+                                    const scale = 5;
+                                    const blob = await domtoimage.toBlob(page, {
+                                        width: pageWidth * scale,
+                                        height: pageHeight * scale,
+                                        style: {
+                                            transform: `scale(${scale})`,
+                                            transformOrigin: 'top left',
+                                            width: pageWidth + 'px',
+                                            height: pageHeight + 'px'
+                                        },
+                                        quality: 1.0,
+                                        cacheBust: true
                                     });
-                                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
                                     console.log(`Page ${i + 1} fallback export, size: ${(blob.size / 1024).toFixed(2)} KB`);
                                     zip.file(`page-${String(i + 1).padStart(2, '0')}.png`, blob);
                                 } catch (fallbackError) {
