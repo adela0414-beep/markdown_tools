@@ -331,6 +331,16 @@
                     </svg>
                     复制 HTML
                 </button>
+                <button id="copy-wechat-btn"
+                    class="bg-emerald-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path
+                            d="M15.707 4.293a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0l-2.75-2.75a1 1 0 111.414-1.414l2.043 2.043 6.543-6.543a1 1 0 011.414 0z" />
+                        <path
+                            d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V9a1 1 0 10-2 0v6H4V5h7a1 1 0 100-2H4z" />
+                    </svg>
+                    复制到公众号
+                </button>
                 <button id="export-zip-btn"
                     class="bg-orange-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-orange-600 transition-colors flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -535,6 +545,13 @@
                     breaks: true
                 });
 
+                function getRenderedMarkdownHtml(markdown) {
+                    let processedMarkdown = String(markdown || '').replace(/\\n/g, '\n');
+                    // 修复 marked.js 对含标点字符加粗文本的解析问题
+                    processedMarkdown = processedMarkdown.replace(/\*\*(.+?)\*\*/g, '**$1\u200B**');
+                    return marked.parse(processedMarkdown);
+                }
+
                 // Elements
                 const markdownInput = document.getElementById('markdown-input');
                 const previewArea = document.getElementById('preview-area');
@@ -549,6 +566,7 @@
                 const watermarkTextPanel = document.getElementById('watermark-text-panel');
                 const watermarkTextInput = document.getElementById('watermark-text-input');
                 const copyHtmlBtn = document.getElementById('copy-html-btn');
+                const copyWechatBtn = document.getElementById('copy-wechat-btn');
                 const exportBtn = document.getElementById('export-zip-btn');
                 const loadingIndicator = document.getElementById('loading-indicator');
 
@@ -894,14 +912,8 @@ function generatePages(markdown) {
 
                 async function renderAndPaginate() {
                     try {
-                        // 1. 处理\n符号，将其转换为实际换行
-                        let processedMarkdown = state.markdown.replace(/\\n/g, '\n');
-                        // 修复 marked.js 对含标点字符加粗文本的解析问题
-                        // 例如 **巨星农牧（603477）**的 → 在闭合**前插入零宽空格使解析器正确识别
-                        processedMarkdown = processedMarkdown.replace(/\*\*(.+?)\*\*/g, '**$1\u200B**');
-
-                        // 2. Parse Markdown to HTML
-                        const rawHtml = marked.parse(processedMarkdown);
+                        // 1. Preprocess markdown and parse to HTML
+                        const rawHtml = getRenderedMarkdownHtml(state.markdown);
 
                         // 2. Style the hidden renderer for measurement
                         hiddenRenderer.className = `rendered-content`;
@@ -1541,6 +1553,436 @@ function generatePages(markdown) {
                     });
                 }
 
+                function setStyles(element, styles) {
+                    Object.entries(styles).forEach(([property, value]) => {
+                        if (value !== undefined && value !== null) {
+                            element.style.setProperty(property, value);
+                        }
+                    });
+                }
+
+                function applyHighlightInlineStyles(contentContainer) {
+                    const highlightStyles = [
+                        ['.hljs-comment, .hljs-quote', { color: '#5c6370', 'font-style': 'italic' }],
+                        ['.hljs-doctag, .hljs-keyword, .hljs-formula', { color: '#c678dd' }],
+                        ['.hljs-section, .hljs-name, .hljs-selector-tag, .hljs-deletion, .hljs-subst', { color: '#e06c75' }],
+                        ['.hljs-literal', { color: '#56b6c2' }],
+                        ['.hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute, .hljs-meta .hljs-string', { color: '#98c379' }],
+                        ['.hljs-attr, .hljs-variable, .hljs-template-variable, .hljs-type, .hljs-selector-class, .hljs-selector-attr, .hljs-selector-pseudo, .hljs-number', { color: '#d19a66' }],
+                        ['.hljs-symbol, .hljs-bullet, .hljs-link, .hljs-meta, .hljs-selector-id, .hljs-title', { color: '#61aeee' }],
+                        ['.hljs-built_in, .hljs-title.class_, .hljs-class .hljs-title', { color: '#e6c07b' }],
+                        ['.hljs-emphasis', { 'font-style': 'italic' }],
+                        ['.hljs-strong', { 'font-weight': '700' }]
+                    ];
+
+                    highlightStyles.forEach(([selector, styles]) => {
+                        contentContainer.querySelectorAll(selector).forEach(item => setStyles(item, styles));
+                    });
+                }
+
+                function getWechatTableTextWeight(text) {
+                    return Array.from(String(text || '').trim()).reduce((weight, char) => {
+                        if (/\s/.test(char)) return weight + 0.25;
+                        if (/[\u4e00-\u9fff]/.test(char)) return weight + 2;
+                        if (/[A-Z0-9]/.test(char)) return weight + 1.1;
+                        if (/[a-z]/.test(char)) return weight + 0.85;
+                        return weight + 0.5;
+                    }, 0);
+                }
+
+                function distributeWechatTableWidths(weights, minWidths, maxWidths) {
+                    const widths = [...minWidths];
+                    let remaining = 100 - widths.reduce((sum, width) => sum + width, 0);
+                    const active = weights.map((_, index) => index);
+
+                    while (remaining > 0.01 && active.length) {
+                        const totalWeight = active.reduce((sum, index) => sum + weights[index], 0) || active.length;
+                        let used = 0;
+
+                        for (let i = active.length - 1; i >= 0; i--) {
+                            const index = active[i];
+                            const addition = remaining * (weights[index] / totalWeight);
+                            const nextWidth = Math.min(maxWidths[index], widths[index] + addition);
+                            used += nextWidth - widths[index];
+                            widths[index] = nextWidth;
+
+                            if (maxWidths[index] - widths[index] < 0.01) {
+                                active.splice(i, 1);
+                            }
+                        }
+
+                        if (used < 0.01) break;
+                        remaining -= used;
+                    }
+
+                    const total = widths.reduce((sum, width) => sum + width, 0);
+                    return widths.map(width => (width / total) * 100);
+                }
+
+                function balanceWechatTableColumns(table) {
+                    const rows = Array.from(table.rows);
+                    if (!rows.length) return;
+
+                    const columnCount = Math.max(...rows.map(row => Array.from(row.cells).reduce((sum, cell) => sum + cell.colSpan, 0)));
+                    if (!columnCount || columnCount === 1) return;
+
+                    const maxWeights = Array.from({ length: columnCount }, () => 1);
+                    const totalWeights = Array.from({ length: columnCount }, () => 0);
+                    const cellCounts = Array.from({ length: columnCount }, () => 0);
+
+                    rows.forEach(row => {
+                        let columnIndex = 0;
+                        Array.from(row.cells).forEach(cell => {
+                            const weight = Math.max(getWechatTableTextWeight(cell.textContent), 2);
+                            const span = Math.max(cell.colSpan || 1, 1);
+                            const weightPerColumn = weight / span;
+
+                            for (let i = 0; i < span && columnIndex + i < columnCount; i++) {
+                                const targetIndex = columnIndex + i;
+                                maxWeights[targetIndex] = Math.max(maxWeights[targetIndex], weightPerColumn);
+                                totalWeights[targetIndex] += weightPerColumn;
+                                cellCounts[targetIndex] += 1;
+                            }
+
+                            columnIndex += span;
+                        });
+                    });
+
+                    const averageWeights = totalWeights.map((total, index) => total / Math.max(cellCounts[index], 1));
+                    const weights = maxWeights.map((maxWeight, index) => Math.max(maxWeight * 0.7, averageWeights[index] * 1.2, 3));
+                    const minWidths = Array.from({ length: columnCount }, () => Math.max(10, Math.min(18, 100 / columnCount * 0.55)));
+                    const maxWidths = Array.from({ length: columnCount }, () => Math.min(55, Math.max(28, 100 / columnCount * 1.8)));
+
+                    if (columnCount >= 3 && maxWeights[0] <= 14) {
+                        minWidths[0] = 18;
+                        maxWidths[0] = 24;
+                    }
+
+                    const widths = distributeWechatTableWidths(weights, minWidths, maxWidths);
+                    table.querySelector('colgroup')?.remove();
+
+                    const colgroup = document.createElement('colgroup');
+                    widths.forEach(width => {
+                        const col = document.createElement('col');
+                        col.style.width = `${width.toFixed(2)}%`;
+                        colgroup.appendChild(col);
+                    });
+                    table.insertBefore(colgroup, table.firstChild);
+
+                    rows.forEach(row => {
+                        let columnIndex = 0;
+                        Array.from(row.cells).forEach(cell => {
+                            const span = Math.max(cell.colSpan || 1, 1);
+                            const cellWidth = widths.slice(columnIndex, columnIndex + span).reduce((sum, width) => sum + width, 0);
+                            cell.style.width = `${cellWidth.toFixed(2)}%`;
+                            if (columnIndex === 0 && span === 1 && maxWeights[0] <= 14) {
+                                cell.style.whiteSpace = 'nowrap';
+                            }
+                            columnIndex += span;
+                        });
+                    });
+                }
+
+                function applyWechatInlineStyles(pageContainer, contentContainer) {
+                    const currentTheme = themes[state.theme] || themes.sunshine;
+                    const textColor = currentTheme.text;
+                    const borderColor = currentTheme.border;
+                    const codeBackground = currentTheme.codeBackground;
+                    const headingColor = currentTheme.headingColor;
+                    const strongColor = currentTheme.strongColor;
+                    const linkColor = currentTheme.linkColor;
+                    const tableStripe = currentTheme.tableStripe || codeBackground;
+                    const wechatFontSize = Math.max(Number(state.fontSize) || 16, 16);
+                    const wechatSmallFontSize = Math.max(wechatFontSize - 1, 14);
+                    const wechatH1FontSize = Math.round(wechatFontSize * 1.35);
+                    const wechatH2FontSize = Math.round(wechatFontSize * 1.18);
+
+                    setStyles(pageContainer, {
+                        margin: '0 auto',
+                        padding: '0',
+                        'box-sizing': 'border-box',
+                        color: textColor,
+                        'font-family': state.fontFamily,
+                        'font-size': `${wechatFontSize}px`,
+                        'line-height': '1.8',
+                        'letter-spacing': '0.5px',
+                        'max-width': '100%',
+                        'word-break': 'break-word'
+                    });
+
+                    setStyles(contentContainer, {
+                        margin: '0',
+                        padding: '0',
+                        color: textColor,
+                        'font-family': state.fontFamily,
+                        'font-size': `${wechatFontSize}px`,
+                        'line-height': '1.8',
+                        'letter-spacing': '0.5px',
+                        'word-break': 'break-word'
+                    });
+
+                    contentContainer.querySelectorAll('h1').forEach(h1 => {
+                        setStyles(h1, {
+                            color: headingColor,
+                            'font-size': `${wechatH1FontSize}px`,
+                            'font-weight': '700',
+                            margin: '0.4em 0 0.3em 0',
+                            'line-height': '1.3',
+                            'border-bottom': `2px solid ${headingColor}`,
+                            'padding-bottom': '0.2em'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('h2').forEach(h2 => {
+                        setStyles(h2, {
+                            color: headingColor,
+                            'font-size': `${wechatH2FontSize}px`,
+                            'font-weight': '700',
+                            margin: '0.6em 0.4em 0.2em 0',
+                            'padding-left': '0.4em',
+                            'border-left': `5px solid ${headingColor}`,
+                            'line-height': '1.3'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('h3, h4, h5, h6').forEach(heading => {
+                        setStyles(heading, {
+                            color: headingColor,
+                            'font-size': `${wechatFontSize}px`,
+                            'font-weight': '700',
+                            margin: '0.4em 0 0.2em 0',
+                            'line-height': '1.3'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('p').forEach(p => {
+                        setStyles(p, {
+                            margin: '18px 0',
+                            'line-height': '1.8',
+                            'letter-spacing': '0.5px',
+                            'font-size': `${wechatFontSize}px`,
+                            'word-spacing': 'normal',
+                            'text-align': 'justify'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('ul, ol').forEach(list => {
+                        setStyles(list, {
+                            'font-size': `${wechatFontSize}px`,
+                            margin: '16px 0',
+                            'padding-left': '28px',
+                            'line-height': '1.8',
+                            'letter-spacing': '0.5px'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('ul').forEach(list => setStyles(list, { 'list-style-type': 'disc' }));
+                    contentContainer.querySelectorAll('ol').forEach(list => setStyles(list, { 'list-style-type': 'decimal' }));
+                    contentContainer.querySelectorAll('li').forEach(li => {
+                        setStyles(li, {
+                            'font-size': `${wechatFontSize}px`,
+                            'margin-bottom': '8px',
+                            'line-height': '1.8',
+                            display: 'list-item'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('blockquote').forEach(blockquote => {
+                        setStyles(blockquote, {
+                            color: textColor,
+                            'border-left': `4px solid ${borderColor}`,
+                            padding: '16px 20px',
+                            margin: '20px 0',
+                            'line-height': '1.8',
+                            'letter-spacing': '0.5px'
+                        });
+
+                        blockquote.querySelectorAll('p').forEach(p => {
+                            setStyles(p, {
+                                color: textColor,
+                                'font-size': `${wechatSmallFontSize}px`,
+                                margin: '8px 0',
+                                'line-height': '1.8',
+                                'letter-spacing': '0.5px',
+                                'word-spacing': 'normal'
+                            });
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('img').forEach(img => {
+                        setStyles(img, {
+                            'max-width': '100%',
+                            height: 'auto',
+                            'border-radius': '8px',
+                            'margin-bottom': '0.8em',
+                            display: 'block'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('pre').forEach(pre => {
+                        setStyles(pre, {
+                            margin: '20px 0',
+                            padding: '0.5em',
+                            'border-radius': '4px',
+                            'line-height': '1.6',
+                            overflow: 'auto',
+                            'background-color': '#282c34',
+                            color: '#abb2bf'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('code').forEach(code => {
+                        setStyles(code, {
+                            color: textColor,
+                            'background-color': codeBackground,
+                            padding: '0.2em 0.4em',
+                            'border-radius': '3px',
+                            'font-family': "'Courier New', Courier, monospace",
+                            'font-size': `${wechatSmallFontSize}px`
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('pre code').forEach(code => {
+                        setStyles(code, {
+                            color: '#abb2bf',
+                            'background-color': 'transparent',
+                            padding: '0',
+                            'border-radius': '0',
+                            'font-size': `${wechatSmallFontSize}px`
+                        });
+                    });
+
+                    applyHighlightInlineStyles(contentContainer);
+
+                    contentContainer.querySelectorAll('strong').forEach(strong => {
+                        setStyles(strong, {
+                            color: strongColor,
+                            'font-weight': '700'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('em').forEach(em => {
+                        setStyles(em, {
+                            color: strongColor,
+                            'font-style': 'italic'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('a').forEach(link => {
+                        setStyles(link, {
+                            color: linkColor,
+                            'text-decoration': 'none',
+                            'border-bottom': `1px solid ${linkColor}`
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('table').forEach(table => {
+                        setStyles(table, {
+                            width: '100%',
+                            'table-layout': 'fixed',
+                            'border-collapse': 'collapse',
+                            margin: '20px 0',
+                            border: `1px solid ${borderColor}`
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('th, td').forEach(cell => {
+                        setStyles(cell, {
+                            'font-size': `${wechatSmallFontSize}px`,
+                            border: `1px solid ${borderColor}`,
+                            padding: '0.5em 0.8em',
+                            'text-align': 'left',
+                            'vertical-align': 'top',
+                            'word-break': 'normal',
+                            'overflow-wrap': 'break-word'
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('th').forEach(th => {
+                        setStyles(th, {
+                            'font-weight': '700',
+                            'background-color': codeBackground,
+                            color: textColor
+                        });
+                    });
+
+                    contentContainer.querySelectorAll('tbody tr').forEach((tr, index) => {
+                        if (index % 2 !== 0) {
+                            setStyles(tr, { 'background-color': tableStripe });
+                        }
+                    });
+
+                    contentContainer.querySelectorAll('table').forEach(table => {
+                        balanceWechatTableColumns(table);
+                    });
+
+                    contentContainer.querySelectorAll('hr').forEach(hr => {
+                        setStyles(hr, {
+                            border: '0',
+                            height: '1px',
+                            margin: '1em 0',
+                            'background-image': `linear-gradient(to right, transparent, ${currentTheme.accent}, transparent)`
+                        });
+                    });
+                }
+
+                function buildWechatClipboardHtml() {
+                    const currentTheme = themes[state.theme] || themes.sunshine;
+                    const page = document.createElement('section');
+                    const content = document.createElement('section');
+
+                    page.setAttribute('data-theme', currentTheme.name);
+                    content.innerHTML = getRenderedMarkdownHtml(state.markdown);
+                    page.appendChild(content);
+
+                    applyWechatInlineStyles(page, content);
+
+                    const html = `<!--StartFragment-->${page.outerHTML}<!--EndFragment-->`;
+                    const plainText = content.textContent.replace(/\n{3,}/g, '\n\n').trim();
+                    return { html, plainText };
+                }
+
+                function copyHtmlBySelection(html) {
+                    const container = document.createElement('div');
+                    container.setAttribute('contenteditable', 'true');
+                    setStyles(container, {
+                        position: 'fixed',
+                        left: '-9999px',
+                        top: '0',
+                        opacity: '0',
+                        'pointer-events': 'none'
+                    });
+                    container.innerHTML = html;
+                    document.body.appendChild(container);
+
+                    const selection = window.getSelection();
+                    const range = document.createRange();
+                    range.selectNodeContents(container);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+
+                    const succeeded = document.execCommand('copy');
+                    selection.removeAllRanges();
+                    document.body.removeChild(container);
+
+                    if (!succeeded) {
+                        throw new Error('execCommand copy failed');
+                    }
+                }
+
+                async function copyRichHtml(html, plainText) {
+                    if (navigator.clipboard && window.ClipboardItem) {
+                        const clipboardItem = new ClipboardItem({
+                            'text/html': new Blob([html], { type: 'text/html' }),
+                            'text/plain': new Blob([plainText], { type: 'text/plain' })
+                        });
+                        await navigator.clipboard.write([clipboardItem]);
+                        return;
+                    }
+
+                    copyHtmlBySelection(html);
+                }
+
                 // --- EVENT LISTENERS ---
 
                 markdownInput.addEventListener('input', (e) => {
@@ -1589,10 +2031,7 @@ function generatePages(markdown) {
 
                 // --- COPY HTML LOGIC ---
                 copyHtmlBtn.addEventListener('click', async () => {
-                    let processedMarkdown = state.markdown.replace(/\\n/g, '\n');
-                    // 修复 marked.js 对含标点字符加粗文本的解析问题
-                    processedMarkdown = processedMarkdown.replace(/\*\*(.+?)\*\*/g, '**$1\u200B**');
-                    const rawHtml = marked.parse(processedMarkdown);
+                    const rawHtml = getRenderedMarkdownHtml(state.markdown);
                     try {
                         const blob = new Blob([rawHtml], { type: 'text/html' });
                         const clipboardItem = new ClipboardItem({
@@ -1605,6 +2044,26 @@ function generatePages(markdown) {
                         setTimeout(() => { copyHtmlBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" /><path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" /></svg>复制 HTML'; }, 1500);
                     } catch (err) {
                         console.error('Copy failed:', err);
+                    }
+                });
+
+                copyWechatBtn.addEventListener('click', async () => {
+                    const originalHtml = copyWechatBtn.innerHTML;
+                    try {
+                        await waitForActiveFonts();
+                        const { html, plainText } = buildWechatClipboardHtml();
+                        await copyRichHtml(html, plainText);
+
+                        copyWechatBtn.textContent = '✓ 已复制到公众号';
+                        setTimeout(() => {
+                            copyWechatBtn.innerHTML = originalHtml;
+                        }, 1500);
+                    } catch (err) {
+                        console.error('Copy to WeChat failed:', err);
+                        copyWechatBtn.textContent = '复制失败';
+                        setTimeout(() => {
+                            copyWechatBtn.innerHTML = originalHtml;
+                        }, 1800);
                     }
                 });
 
