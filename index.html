@@ -65,7 +65,7 @@
 
         .preview-page-watermark-mark {
             position: absolute;
-            right: 0;
+            left: 0;
             bottom: 3px;
             max-width: 100%;
         }
@@ -79,7 +79,7 @@
             line-height: 14px;
             height: 18px;
             padding-bottom: 3px;
-            text-align: right;
+            text-align: left;
             white-space: nowrap;
             max-width: 100%;
             overflow: visible;
@@ -835,7 +835,8 @@ function generatePages(markdown) {
                     }
                 };
 
-                const defaultWatermarkText = '打开「口/袋/分/析/师」VX小程序搜索公司名看完整报告';
+                const defaultWatermarkText = '【口袋分析师微信小程序】看1w+家A/港/美公司完整报告';
+                const wechatGreen = '#07C160';
 
                 function hexToRgba(hex, alpha) {
                     if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
@@ -888,7 +889,7 @@ function generatePages(markdown) {
 
                 function updateWatermarkTheme(pageContainer, strongColor, textColor) {
                     pageContainer.querySelectorAll('.preview-page-watermark-text').forEach(item => {
-                        item.style.color = hexToRgba(strongColor, 1);
+                        item.style.color = wechatGreen;
                     });
                     pageContainer.querySelectorAll('.preview-page-watermark-dot').forEach(item => {
                         item.style.backgroundColor = hexToRgba(textColor, 1);
