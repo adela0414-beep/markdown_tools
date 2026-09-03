@@ -9,7 +9,7 @@
     <!-- Chosen Palette: Warm Neutrals -->
     <!-- Application Structure Plan: 采用经典的双栏布局。左侧为控制面板，包含Markdown编辑器和所有样式自定义选项，使用户可以方便地输入内容并调整外观。右侧为实时预览区域，即时反馈用户的每一次修改，忠实模拟最终的图片分页效果。这种结构将“输入/控制”与“输出/结果”清晰分离，符合创作者工具的直觉，实现了“所见即所得”的核心用户流程：编辑 -> 预览 -> 调整 -> 导出。 -->
     <!-- Visualization & Content Choices: PRD -> 核心目标是将Markdown渲染为分页图片。 -> 呈现方式是使用HTML/CSS在DOM中创建模拟页面，并用JS实现智能分页算法。 -> 交互核心是编辑器的`input`事件触发实时重新渲染和分页。->  justification: 这是实现实时预览和复杂分页逻辑的最直接、最高效的方式。 -> 使用的库: Tailwind CSS (布局), marked.js (Markdown解析), highlight.js (代码高亮), html2canvas.js (截图), jszip.js (打包)。 -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <!-- Brand icon uses the user-provided WeChat SVG. No Mermaid JS is used. -->
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
@@ -23,6 +23,19 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=LXGW+WenKai&family=Ma+Shan+Zheng&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;700&display=swap');
 
+        :root {
+            --canvas-width: 360px;
+            --canvas-height: 480px;
+            --content-height: 420px;
+            --brand-height: 60px;
+            --safe-offset: 30px;
+            --wechat-green: #07C160;
+            --brand-background: #57534e;
+            --brand-primary: #fafafa;
+            --brand-secondary: #e7e5e4;
+            --brand-border: #78716c;
+        }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
             background-color: #F8F5F2;
@@ -31,8 +44,8 @@
 
         .preview-page {
             box-sizing: border-box;
-            width: 330px;
-            height: 440px;
+            width: var(--canvas-width);
+            height: var(--canvas-height);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             flex-shrink: 0;
@@ -44,59 +57,75 @@
 
         .preview-page-content {
             box-sizing: border-box;
-            overflow: visible;
+            width: 100%;
+            height: var(--content-height);
+            overflow: hidden;
             overflow-wrap: break-word;
             line-break: strict;
             position: relative;
             z-index: 1;
         }
 
-        .preview-page-watermark {
-            position: absolute;
-            left: 12px;
-            right: 12px;
-            bottom: 4px;
-            height: 22px;
+        .preview-page.is-brand-hidden .preview-page-content {
+            margin-top: var(--safe-offset);
+        }
+
+        .preview-page-brand {
+            box-sizing: border-box;
+            width: 100%;
+            height: var(--brand-height);
+            overflow: hidden;
+            color: var(--brand-primary);
+            background: var(--brand-background);
+            border-top: 1px solid var(--brand-border);
             pointer-events: none;
             user-select: none;
             z-index: 2;
-            overflow: visible;
         }
 
-        .preview-page-watermark-mark {
-            position: absolute;
-            left: 0;
-            bottom: 3px;
-            max-width: 100%;
+        .preview-page-brand-lockup {
+            width: 100%;
+            height: 100%;
+            padding: 0 18px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            text-align: center;
         }
 
-        .preview-page-watermark-text {
-            position: relative;
-            z-index: 1;
+        .preview-page-brand-search {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            color: var(--brand-primary);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            font-size: 11px;
+            font-size: 15px;
             font-weight: 700;
-            line-height: 14px;
-            height: 18px;
-            padding-bottom: 3px;
-            text-align: left;
+            line-height: 20px;
             white-space: nowrap;
-            max-width: 100%;
-            overflow: visible;
-            text-overflow: clip;
         }
 
-        .preview-page-watermark-dots {
-            position: absolute;
-            inset: -1px 0 0 0;
-            z-index: 2;
+        .preview-page-brand-icon {
+            width: 18px;
+            height: 18px;
+            display: block;
+            flex: 0 0 18px;
+            color: var(--wechat-green);
         }
 
-        .preview-page-watermark-dot {
-            position: absolute;
-            width: 2px;
-            height: 2px;
-            border-radius: 999px;
+        .preview-page-brand-claim {
+            margin: 0;
+            color: var(--brand-secondary);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 11.5px;
+            font-weight: 600;
+            line-height: 15px;
+            white-space: nowrap;
         }
 
         .rendered-content h1 {
@@ -112,9 +141,17 @@
             font-size: 1.1em;
             font-weight: bolder;
             margin: 0.6em 0.4em 0.2em 0;
-            padding-left: 0.4em;
-            border-left: 5px solid currentColor;
+            padding-left: 0;
+            border-left: 0;
             line-height: 1.3;
+        }
+
+        .rendered-content h2::before {
+            content: '▌';
+            display: inline;
+            margin-right: 0.4em;
+            font: inherit;
+            line-height: inherit;
         }
 
         .rendered-content h3 {
@@ -216,7 +253,7 @@
             padding: 0.5em;
             border-radius: 4px;
             line-height: 1.4;
-            overflow-x: auto;
+            overflow: hidden;
         }
 
         .rendered-content code {
@@ -232,6 +269,10 @@
             background-color: transparent;
             padding: 0;
             color: inherit;
+            overflow: visible;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .rendered-content strong {
@@ -299,11 +340,12 @@
 
         /* For the pagination algorithm */
         #hidden-renderer {
+            box-sizing: border-box;
             position: absolute;
             top: -9999px;
             left: -9999px;
             visibility: hidden;
-            width: 330px;
+            width: var(--canvas-width);
             /* Same as preview page */
         }
     </style>
@@ -420,26 +462,51 @@
                         </div>
                     </div>
 
-                    <!-- 第三行：水印选项 -->
+                    <!-- 第三行：版式与品牌区 -->
                     <div class="pt-3 border-t border-gray-200">
-                        <div class="flex items-center justify-between gap-3">
-                            <div class="flex items-center">
-                                <input id="watermark-checkbox" type="checkbox" checked
-                                    class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer">
-                                <label for="watermark-checkbox"
-                                    class="ml-2 block text-sm font-medium text-gray-700 cursor-pointer">显示水印</label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="layout-preset-select"
+                                    class="block text-sm font-medium text-gray-700 mb-2">版式安全区</label>
+                                <select id="layout-preset-select"
+                                    class="w-full border-gray-300 rounded-lg shadow-sm focus:ring-orange-500 focus:border-orange-500 text-sm py-2">
+                                    <option value="compact">紧凑 · 正文 90%</option>
+                                    <option value="standard" selected>标准 · 正文 87.5%</option>
+                                    <option value="wide">宽松 · 正文 85%</option>
+                                </select>
                             </div>
-                            <button id="toggle-watermark-text-btn" type="button"
+                            <div>
+                                <span class="block text-sm font-medium text-gray-700 mb-2">品牌区域</span>
+                                <div class="flex items-center h-[38px]">
+                                    <input id="brand-checkbox" type="checkbox" checked
+                                    class="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded cursor-pointer">
+                                    <label for="brand-checkbox"
+                                        class="ml-2 block text-sm font-medium text-gray-700 cursor-pointer">显示品牌区</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex justify-end">
+                            <button id="toggle-brand-copy-btn" type="button"
                                 class="text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
-                                aria-expanded="false" aria-controls="watermark-text-panel">
-                                修改文案
+                                aria-expanded="false" aria-controls="brand-copy-panel">
+                                修改品牌文案
                             </button>
                         </div>
-                        <div id="watermark-text-panel" class="hidden mt-3">
-                            <label for="watermark-text-input" class="block text-sm font-medium text-gray-700 mb-2">水印文案</label>
-                            <input id="watermark-text-input" type="text"
-                                class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
-                                autocomplete="off">
+                        <div id="brand-copy-panel" class="hidden mt-3 grid gap-3">
+                            <div>
+                                <label for="brand-search-input"
+                                    class="block text-sm font-medium text-gray-700 mb-2">搜索引导</label>
+                                <input id="brand-search-input" type="text"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
+                                    autocomplete="off">
+                            </div>
+                            <div>
+                                <label for="brand-claim-input"
+                                    class="block text-sm font-medium text-gray-700 mb-2">价值主张</label>
+                                <input id="brand-claim-input" type="text"
+                                    class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
+                                    autocomplete="off">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -561,10 +628,12 @@
                 const fontSelect = document.getElementById('font-select');
                 const fontSizeSlider = document.getElementById('font-size-slider');
                 const fontSizeValue = document.getElementById('font-size-value');
-                const watermarkCheckbox = document.getElementById('watermark-checkbox');
-                const toggleWatermarkTextBtn = document.getElementById('toggle-watermark-text-btn');
-                const watermarkTextPanel = document.getElementById('watermark-text-panel');
-                const watermarkTextInput = document.getElementById('watermark-text-input');
+                const layoutPresetSelect = document.getElementById('layout-preset-select');
+                const brandCheckbox = document.getElementById('brand-checkbox');
+                const toggleBrandCopyBtn = document.getElementById('toggle-brand-copy-btn');
+                const brandCopyPanel = document.getElementById('brand-copy-panel');
+                const brandSearchInput = document.getElementById('brand-search-input');
+                const brandClaimInput = document.getElementById('brand-claim-input');
                 const copyHtmlBtn = document.getElementById('copy-html-btn');
                 const copyWechatBtn = document.getElementById('copy-wechat-btn');
                 const exportBtn = document.getElementById('export-zip-btn');
@@ -601,7 +670,7 @@ function generatePages(markdown) {
   "title": "Markdown 智能分页切图工具",
   "theme": "001",
   "features": ["实时预览", "智能分页", "代码高亮"],
-  "watermark": true
+  "brandArea": true
 }
 \`\`\`
 
@@ -656,6 +725,10 @@ function generatePages(markdown) {
                         linkColor: '#404040',
                         tableStripe: '#f5f5f5',
                         tableHover: '#e5e5e5',
+                        brandBackground: '#57534E',
+                        brandPrimary: '#FAFAFA',
+                        brandSecondary: '#E7E5E4',
+                        brandBorder: '#78716C',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #262626 0%, #737373 100%)',
                             color: '#ffffff',
@@ -675,6 +748,10 @@ function generatePages(markdown) {
                         linkColor: '#2563eb',
                         tableStripe: '#f8fafc',
                         tableHover: '#e2e8f0',
+                        brandBackground: '#475569',
+                        brandPrimary: '#F8FAFC',
+                        brandSecondary: '#E2E8F0',
+                        brandBorder: '#64748B',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #334155 0%, #64748b 100%)',
                             color: '#f8fafc',
@@ -694,6 +771,10 @@ function generatePages(markdown) {
                         linkColor: '#92400e',
                         tableStripe: '#fbf7f0',
                         tableHover: '#efe3d2',
+                        brandBackground: '#6B5142',
+                        brandPrimary: '#FFFAF0',
+                        brandSecondary: '#EADBCB',
+                        brandBorder: '#9A7656',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #6f5238 0%, #9a7656 100%)',
                             color: '#fffaf0',
@@ -713,6 +794,10 @@ function generatePages(markdown) {
                         linkColor: '#5b5f2f',
                         tableStripe: '#f6f2e8',
                         tableHover: '#ebe4d4',
+                        brandBackground: '#42594A',
+                        brandPrimary: '#FBFAF5',
+                        brandSecondary: '#E7E2D6',
+                        brandBorder: '#687267',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #2f3a33 0%, #687267 100%)',
                             color: '#fbfaf5',
@@ -732,6 +817,10 @@ function generatePages(markdown) {
                         linkColor: '#0284c7',
                         tableStripe: '#f5fbff',
                         tableHover: '#dff3ff',
+                        brandBackground: '#075985',
+                        brandPrimary: '#F0F9FF',
+                        brandSecondary: '#D7F0FE',
+                        brandBorder: '#0EA5E9',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #38bdf8 0%, #0f766e 100%)',
                             color: '#f0fdfa',
@@ -751,6 +840,10 @@ function generatePages(markdown) {
                         linkColor: '#fbbf24',
                         tableStripe: '#182235',
                         tableHover: '#243044',
+                        brandBackground: '#1F2937',
+                        brandPrimary: '#F9FAFB',
+                        brandSecondary: '#D1D5DB',
+                        brandBorder: '#4B5563',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #0f172a 0%, #374151 100%)',
                             color: '#e5e7eb',
@@ -770,6 +863,10 @@ function generatePages(markdown) {
                         linkColor: '#a78bfa',
                         tableStripe: '#0f1730',
                         tableHover: '#172554',
+                        brandBackground: '#172554',
+                        brandPrimary: '#E0F2FE',
+                        brandSecondary: '#BAE6FD',
+                        brandBorder: '#2563EB',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #0891b2 0%, #7c3aed 100%)',
                             color: '#f8fafc',
@@ -789,6 +886,10 @@ function generatePages(markdown) {
                         linkColor: '#15803d',
                         tableStripe: '#f0fdf4',
                         tableHover: '#dcfce7',
+                        brandBackground: '#365E45',
+                        brandPrimary: '#F0FDF4',
+                        brandSecondary: '#DCFCE7',
+                        brandBorder: '#4A7A5C',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #15803d 0%, #84cc16 100%)',
                             color: '#f7fee7',
@@ -808,6 +909,10 @@ function generatePages(markdown) {
                         linkColor: '#ea580c',
                         tableStripe: '#fff7ed',
                         tableHover: '#ffedd5',
+                        brandBackground: '#9A3412',
+                        brandPrimary: '#FFF7ED',
+                        brandSecondary: '#FFEDD5',
+                        brandBorder: '#F97316',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #fde68a 0%, #f59e0b 100%)',
                             color: '#3a2416',
@@ -827,6 +932,10 @@ function generatePages(markdown) {
                         linkColor: '#e11d48',
                         tableStripe: '#fff1f2',
                         tableHover: '#ffe4e6',
+                        brandBackground: '#881337',
+                        brandPrimary: '#FFF1F2',
+                        brandSecondary: '#FFE4E6',
+                        brandBorder: '#E11D48',
                         blockquoteStyle: {
                             background: 'linear-gradient(135deg, #fb7185 0%, #f97316 100%)',
                             color: '#fff7ed',
@@ -835,65 +944,85 @@ function generatePages(markdown) {
                     }
                 };
 
-                const defaultWatermarkText = '【口袋分析师微信小程序】看1w+家A/港/美公司完整报告';
-                const wechatGreen = '#07C160';
+                const CANVAS_CONFIG = Object.freeze({
+                    pageWidth: 360,
+                    pageHeight: 480,
+                    exportScale: 3,
+                    exportWidth: 1080,
+                    exportHeight: 1440
+                });
 
-                function hexToRgba(hex, alpha) {
-                    if (!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex)) {
-                        return hex;
-                    }
+                const LAYOUT_PRESETS = Object.freeze({
+                    compact: Object.freeze({ contentHeight: 432, brandHeight: 48, safeOffset: 24 }),
+                    standard: Object.freeze({ contentHeight: 420, brandHeight: 60, safeOffset: 30 }),
+                    wide: Object.freeze({ contentHeight: 408, brandHeight: 72, safeOffset: 36 })
+                });
 
-                    let value = hex.slice(1);
-                    if (value.length === 3) {
-                        value = value.split('').map(char => char + char).join('');
-                    }
+                const CONTENT_INSET = Object.freeze({ horizontal: 18, vertical: 16 });
 
-                    const intValue = parseInt(value, 16);
-                    const red = (intValue >> 16) & 255;
-                    const green = (intValue >> 8) & 255;
-                    const blue = intValue & 255;
-                    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+        const defaultBrandSearchText = '搜索“口袋分析师”';
+                const defaultBrandClaimText = '看1万+A/港/美股上市公司完整报告';
+                const WECHAT_ICON_PATHS = Object.freeze([
+                    'M11.176 14.429c-2.665 0-4.826-1.8-4.826-4.018 0-2.22 2.159-4.02 4.824-4.02S16 8.191 16 10.411c0 1.21-.65 2.301-1.666 3.036a.32.32 0 0 0-.12.366l.218.81a.6.6 0 0 1 .029.117.166.166 0 0 1-.162.162.2.2 0 0 1-.092-.03l-1.057-.61a.5.5 0 0 0-.256-.074.5.5 0 0 0-.142.021 5.7 5.7 0 0 1-1.576.22M9.064 9.542a.647.647 0 1 0 .557-1 .645.645 0 0 0-.646.647.6.6 0 0 0 .09.353Zm3.232.001a.646.646 0 1 0 .546-1 .645.645 0 0 0-.644.644.63.63 0 0 0 .098.356',
+                    'M0 6.826c0 1.455.781 2.765 2.001 3.656a.385.385 0 0 1 .143.439l-.161.6-.1.373a.5.5 0 0 0-.032.14.19.19 0 0 0 .193.193q.06 0 .111-.029l1.268-.733a.6.6 0 0 1 .308-.088q.088 0 .171.025a6.8 6.8 0 0 0 1.625.26 4.5 4.5 0 0 1-.177-1.251c0-2.936 2.785-5.02 5.824-5.02l.15.002C10.587 3.429 8.392 2 5.796 2 2.596 2 0 4.16 0 6.826m4.632-1.555a.77.77 0 1 1-1.54 0 .77.77 0 0 1 1.54 0m3.875 0a.77.77 0 1 1-1.54 0 .77.77 0 0 1 1.54 0'
+                ]);
+
+                function getActiveLayout() {
+                    return LAYOUT_PRESETS[state.layoutPreset] || LAYOUT_PRESETS.standard;
                 }
 
-                function createWatermarkLayer() {
-                    const layer = document.createElement('div');
-                    layer.className = 'preview-page-watermark';
-
-                    const mark = document.createElement('div');
-                    mark.className = 'preview-page-watermark-mark';
-
-                    const dots = document.createElement('div');
-                    dots.className = 'preview-page-watermark-dots';
-
-                    Array.from({ length: 72 }).forEach(() => {
-                        const dot = document.createElement('span');
-                        const size = Math.random() > 0.82 ? 3 : 2;
-                        dot.className = 'preview-page-watermark-dot';
-                        dot.style.left = `${Math.random() * 100}%`;
-                        dot.style.top = `${Math.random() * 100}%`;
-                        dot.style.width = `${size}px`;
-                        dot.style.height = `${size}px`;
-                        dot.style.opacity = '0.8';
-                        dots.appendChild(dot);
-                    });
-
-                    const text = document.createElement('div');
-                    text.className = 'preview-page-watermark-text';
-                    text.textContent = state.watermarkText;
-
-                    mark.appendChild(text);
-                    mark.appendChild(dots);
-                    layer.appendChild(mark);
-                    return layer;
+                function applyCanvasLayout(pageContainer) {
+                    const layout = getActiveLayout();
+                    pageContainer.style.setProperty('--content-height', `${layout.contentHeight}px`);
+                    pageContainer.style.setProperty('--brand-height', `${layout.brandHeight}px`);
+                    pageContainer.style.setProperty('--safe-offset', `${layout.safeOffset}px`);
+                    pageContainer.classList.toggle('is-brand-hidden', !state.showBrand);
                 }
 
-                function updateWatermarkTheme(pageContainer, strongColor, textColor) {
-                    pageContainer.querySelectorAll('.preview-page-watermark-text').forEach(item => {
-                        item.style.color = wechatGreen;
+                function createWechatIcon() {
+                    const namespace = 'http://www.w3.org/2000/svg';
+                    const icon = document.createElementNS(namespace, 'svg');
+                    icon.classList.add('preview-page-brand-icon');
+                    icon.setAttribute('viewBox', '0 0 16 16');
+                    icon.setAttribute('fill', 'currentColor');
+                    icon.setAttribute('aria-hidden', 'true');
+                    icon.setAttribute('focusable', 'false');
+
+                    WECHAT_ICON_PATHS.forEach(pathData => {
+                        const path = document.createElementNS(namespace, 'path');
+                        path.setAttribute('d', pathData);
+                        icon.appendChild(path);
                     });
-                    pageContainer.querySelectorAll('.preview-page-watermark-dot').forEach(item => {
-                        item.style.backgroundColor = hexToRgba(textColor, 1);
-                    });
+
+                    return icon;
+                }
+
+                function createBrandZone() {
+                    const brandZone = document.createElement('footer');
+                    brandZone.className = 'preview-page-brand';
+                    brandZone.setAttribute('aria-label', '口袋分析师品牌区');
+
+                    const lockup = document.createElement('div');
+                    lockup.className = 'preview-page-brand-lockup';
+
+                    const searchLine = document.createElement('p');
+                    searchLine.className = 'preview-page-brand-search';
+
+                    const icon = createWechatIcon();
+
+                    const searchText = document.createElement('span');
+                    searchText.textContent = state.brandSearchText;
+
+                    const claimLine = document.createElement('p');
+                    claimLine.className = 'preview-page-brand-claim';
+                    claimLine.textContent = state.brandClaimText;
+
+                    searchLine.appendChild(icon);
+                    searchLine.appendChild(searchText);
+                    lockup.appendChild(searchLine);
+                    lockup.appendChild(claimLine);
+                    brandZone.appendChild(lockup);
+                    return brandZone;
                 }
 
                 // App State
@@ -901,10 +1030,13 @@ function generatePages(markdown) {
                     markdown: markdownInput.value,
                     theme: 'sunshine',
                     fontFamily: themes.sunshine.fontFamily,
-                    padding: 15,
+                    paddingX: CONTENT_INSET.horizontal,
+                    paddingY: CONTENT_INSET.vertical,
                     fontSize: 13,
-                    showWatermark: true,
-                    watermarkText: defaultWatermarkText,
+                    layoutPreset: 'standard',
+                    showBrand: true,
+                    brandSearchText: defaultBrandSearchText,
+                    brandClaimText: defaultBrandClaimText
                 };
 
 
@@ -918,22 +1050,20 @@ function generatePages(markdown) {
 
                         // 2. Style the hidden renderer for measurement
                         hiddenRenderer.className = `rendered-content`;
-                        hiddenRenderer.style.padding = `${state.padding}px`;
+                        hiddenRenderer.style.padding = `${state.paddingY}px ${state.paddingX}px`;
                         hiddenRenderer.style.fontSize = `${state.fontSize}px`;
                         hiddenRenderer.style.fontFamily = state.fontFamily;
                         hiddenRenderer.innerHTML = rawHtml;
+                        await waitForPageImages(hiddenRenderer);
 
                         // Clear previous preview
                         previewArea.innerHTML = '';
 
-                        const pageHeight = 440; // Fixed page height
-                        const watermarkHeight = 18;
-                        const watermarkBottom = 4;
-                        const watermarkGap = 2;
-                        const watermarkSafeArea = state.showWatermark ? watermarkHeight + watermarkBottom + watermarkGap : 0;
-                        const contentHeight = pageHeight - state.padding - watermarkSafeArea;
-                        // 无水印时内容可以填满更多页面空间
-                        const overflowTolerance = state.showWatermark ? 38 : 18;
+                        const layout = getActiveLayout();
+                        const pageHeight = CANVAS_CONFIG.pageHeight;
+                        const contentHeight = layout.contentHeight;
+                        const overflowTolerance = 0;
+                        const maximumStandaloneHeight = contentHeight - state.paddingY * 2 - 16;
 
                         let currentPageDiv;
                         let pageContentDiv;
@@ -942,29 +1072,31 @@ function generatePages(markdown) {
                             currentPageDiv = document.createElement('div');
                             currentPageDiv.className = 'preview-page';
                             currentPageDiv.style.position = 'relative';
+                            currentPageDiv.dataset.layoutPreset = state.layoutPreset;
+                            currentPageDiv.dataset.brandVisible = String(state.showBrand);
+                            applyCanvasLayout(currentPageDiv);
 
                             pageContentDiv = document.createElement('div');
                             pageContentDiv.className = 'rendered-content preview-page-content';
-                            pageContentDiv.style.padding = `${state.padding}px`;
+                            pageContentDiv.style.padding = `${state.paddingY}px ${state.paddingX}px`;
                             pageContentDiv.style.fontSize = `${state.fontSize}px`;
                             pageContentDiv.style.fontFamily = state.fontFamily;
-                            pageContentDiv.style.minHeight = 'auto';
-                            pageContentDiv.style.height = 'auto';
-                            pageContentDiv.style.overflow = 'visible';
+                            pageContentDiv.style.minHeight = '0';
+                            pageContentDiv.style.height = `${contentHeight}px`;
+                            pageContentDiv.style.maxHeight = `${contentHeight}px`;
+                            pageContentDiv.style.overflow = 'hidden';
                             pageContentDiv.style.wordWrap = 'break-word';
                             pageContentDiv.style.hyphens = 'auto';
-
-                            // 创建底部水印元素（如果启用）
-                            if (state.showWatermark) {
-                                currentPageDiv.appendChild(createWatermarkLayer());
-                            }
 
                             applyTheme(currentPageDiv, pageContentDiv);
 
                             currentPageDiv.appendChild(pageContentDiv);
+                            if (state.showBrand) {
+                                currentPageDiv.appendChild(createBrandZone());
+                            }
                             previewArea.appendChild(currentPageDiv);
 
-                            console.log(`Created new page. Content height: ${contentHeight}px, Page height: ${pageHeight}px, Padding: ${state.padding}px`);
+                            console.log(`Created new page. Content height: ${contentHeight}px, Page height: ${pageHeight}px, Padding: ${state.paddingY}px ${state.paddingX}px`);
                         }
 
                         // 智能分页算法 - 保持内容连贯性
@@ -985,12 +1117,18 @@ function generatePages(markdown) {
                         async function convertWideTableToImage(tableElement) {
                             try {
                                 // 创建一个临时容器来渲染表格
+                                const currentTheme = themes[state.theme] || themes.sunshine;
                                 const tempContainer = document.createElement('div');
                                 tempContainer.style.position = 'absolute';
                                 tempContainer.style.top = '-9999px';
                                 tempContainer.style.left = '-9999px';
-                                tempContainer.style.backgroundColor = 'white';
+                                tempContainer.style.backgroundColor = currentTheme.background;
+                                tempContainer.style.color = currentTheme.text;
                                 tempContainer.style.padding = '12px';
+                                tempContainer.style.width = 'max-content';
+                                tempContainer.style.maxWidth = 'none';
+                                // html2canvas 会尊重滚动裁切，表格转图时必须暴露完整内容尺寸。
+                                tempContainer.style.overflow = 'visible';
                                 tempContainer.style.fontFamily = state.fontFamily;
                                 tempContainer.style.fontSize = state.fontSize + 'px';
 
@@ -999,36 +1137,48 @@ function generatePages(markdown) {
                                 clonedTable.style.width = 'auto';
                                 clonedTable.style.minWidth = 'max-content';
                                 clonedTable.style.borderCollapse = 'collapse';
-                                clonedTable.style.border = '1px solid #ccc';
-                                clonedTable.style.backgroundColor = '#fff';
+                                clonedTable.style.border = `1px solid ${currentTheme.border}`;
+                                clonedTable.style.backgroundColor = currentTheme.background;
 
                                 // 设置单元格样式 - 居中显示，字体放大
                                 clonedTable.querySelectorAll('th, td').forEach(cell => {
-                                    cell.style.border = '1px solid #ddd';
+                                    cell.style.border = `1px solid ${currentTheme.border}`;
                                     cell.style.padding = '8px 12px';  // 增加内边距
                                     cell.style.textAlign = 'center';  // 文字居中
                                     cell.style.verticalAlign = 'middle';  // 垂直居中
                                     cell.style.whiteSpace = 'nowrap';
                                     cell.style.maxWidth = 'none';
                                     cell.style.fontSize = state.fontSize * 1.1 + 'px';  // 字体放大10%
+                                    cell.style.color = currentTheme.text;
                                 });
 
                                 clonedTable.querySelectorAll('th').forEach(th => {
                                     th.style.fontWeight = 'bold';
-                                    th.style.backgroundColor = '#f5f5f5';
-                                    th.style.color = '#333';
+                                    th.style.backgroundColor = currentTheme.codeBackground;
+                                });
+
+                                clonedTable.querySelectorAll('tbody tr').forEach((row, index) => {
+                                    row.style.backgroundColor = index % 2 === 0
+                                        ? currentTheme.background
+                                        : currentTheme.tableStripe;
                                 });
 
                                 tempContainer.appendChild(clonedTable);
                                 document.body.appendChild(tempContainer);
                                 await waitForActiveFonts();
+                                const tableRenderWidth = Math.ceil(tempContainer.scrollWidth);
+                                const tableRenderHeight = Math.ceil(tempContainer.scrollHeight);
 
                                 // 使用html2canvas转换为图片
                                 const canvas = await html2canvas(tempContainer, {
-                                    backgroundColor: 'white',
+                                    backgroundColor: currentTheme.background,
                                     scale: 2.5,  // 提高清晰度
+                                    width: tableRenderWidth,
+                                    height: tableRenderHeight,
+                                    windowWidth: tableRenderWidth,
+                                    windowHeight: tableRenderHeight,
                                     useCORS: true,
-                                    allowTaint: true
+                                    allowTaint: false
                                 });
 
                                 // 清理临时容器
@@ -1038,11 +1188,18 @@ function generatePages(markdown) {
                                 const img = document.createElement('img');
                                 img.src = canvas.toDataURL('image/png');
                                 img.style.maxWidth = '100%';
+                                img.style.maxHeight = `${maximumStandaloneHeight}px`;
+                                img.style.width = 'auto';
                                 img.style.height = 'auto';
+                                img.style.objectFit = 'contain';
                                 img.style.border = 'none';
                                 img.style.borderRadius = '4px';
                                 img.style.display = 'block';
-                                img.style.margin = '12px auto';
+                                img.style.margin = '8px auto';
+
+                                if (typeof img.decode === 'function') {
+                                    await img.decode();
+                                }
 
                                 return img;
                             } catch (error) {
@@ -1055,7 +1212,24 @@ function generatePages(markdown) {
 
                         // 判断块级元素是否可以被分割
                         function isBlockSplittable(el) {
-                            return ['P', 'DIV', 'BLOCKQUOTE', 'LI'].includes(el.tagName);
+                            return ['P', 'DIV', 'BLOCKQUOTE', 'LI', 'PRE'].includes(el.tagName);
+                        }
+
+                        function constrainStandaloneImages(element) {
+                            const images = element.tagName === 'IMG'
+                                ? [element]
+                                : Array.from(element.querySelectorAll('img'));
+
+                            images.forEach(image => {
+                                image.style.maxWidth = '100%';
+                                image.style.maxHeight = `${maximumStandaloneHeight}px`;
+                                image.style.width = 'auto';
+                                image.style.height = 'auto';
+                                image.style.objectFit = 'contain';
+                                image.style.display = 'block';
+                                image.style.marginLeft = 'auto';
+                                image.style.marginRight = 'auto';
+                            });
                         }
 
                         // 分割内联元素（<strong>, <em>, <a> 等）的文本内容
@@ -1089,7 +1263,7 @@ function generatePages(markdown) {
                         // 按整个元素处理（支持智能分割以减少页面底部空白）
                         async function processElementAsWhole(element, elementIndex, depth) {
                             depth = depth || 0;
-                            if (depth > 10) return; // 防止无限递归
+                            if (depth > 100) return; // 防止无限递归
 
                             // 过滤空元素
                             const textContent = element.textContent?.trim() || '';
@@ -1140,6 +1314,7 @@ function generatePages(markdown) {
                             } else {
                                 clonedElement = element.cloneNode(true);
                             }
+                            constrainStandaloneImages(clonedElement);
 
                             // === 1. 首元素直接添加 ===
                             if (pageContentDiv.children.length === 0) {
@@ -1153,6 +1328,12 @@ function generatePages(markdown) {
                                         await processElementAsWhole(sr.secondPart, elementIndex, depth + 1);
                                         return;
                                     }
+                                }
+                                if (pageContentDiv.scrollHeight > contentHeight + overflowTolerance && clonedElement.tagName === 'TABLE') {
+                                    pageContentDiv.removeChild(clonedElement);
+                                    const tableImage = await convertWideTableToImage(clonedElement);
+                                    await processElementAsWhole(tableImage, elementIndex, depth + 1);
+                                    return;
                                 }
                                 console.log(`First element added to page.`);
                                 return;
@@ -1199,6 +1380,11 @@ function generatePages(markdown) {
                                     await processElementAsWhole(sr.secondPart, elementIndex, depth + 1);
                                     return;
                                 }
+                            }
+                            if (pageContentDiv.scrollHeight > contentHeight + overflowTolerance && clonedElement.tagName === 'TABLE') {
+                                pageContentDiv.removeChild(clonedElement);
+                                const tableImage = await convertWideTableToImage(clonedElement);
+                                await processElementAsWhole(tableImage, elementIndex, depth + 1);
                             }
                         }
 
@@ -1446,10 +1632,13 @@ function generatePages(markdown) {
                     const tableHover = currentTheme.tableHover || borderColor;
 
                     pageContainer.style.backgroundColor = pageBg;
-                    pageContainer.style.border = `1px solid ${borderColor}`;
+                    pageContainer.style.border = 'none';
                     pageContainer.style.boxShadow = `0 8px 24px ${borderColor}66`;
+                    pageContainer.style.setProperty('--brand-background', currentTheme.brandBackground);
+                    pageContainer.style.setProperty('--brand-primary', currentTheme.brandPrimary);
+                    pageContainer.style.setProperty('--brand-secondary', currentTheme.brandSecondary);
+                    pageContainer.style.setProperty('--brand-border', currentTheme.brandBorder);
                     contentContainer.style.color = textColor;
-                    updateWatermarkTheme(pageContainer, strongColor, textColor);
 
                     // H1-H6 标题样式 - 使用主题的标题颜色
                     contentContainer.querySelectorAll('h1').forEach(h1 => {
@@ -2010,23 +2199,33 @@ function generatePages(markdown) {
                     renderAndPaginate();
                 });
 
-                watermarkCheckbox.addEventListener('change', (e) => {
-                    state.showWatermark = e.target.checked;
+                layoutPresetSelect.addEventListener('change', (e) => {
+                    state.layoutPreset = e.target.value;
                     renderAndPaginate();
                 });
 
-                toggleWatermarkTextBtn.addEventListener('click', () => {
-                    const isHidden = watermarkTextPanel.classList.toggle('hidden');
-                    toggleWatermarkTextBtn.setAttribute('aria-expanded', String(!isHidden));
-                    toggleWatermarkTextBtn.textContent = isHidden ? '修改文案' : '收起文案';
+                brandCheckbox.addEventListener('change', (e) => {
+                    state.showBrand = e.target.checked;
+                    renderAndPaginate();
+                });
+
+                toggleBrandCopyBtn.addEventListener('click', () => {
+                    const isHidden = brandCopyPanel.classList.toggle('hidden');
+                    toggleBrandCopyBtn.setAttribute('aria-expanded', String(!isHidden));
+                    toggleBrandCopyBtn.textContent = isHidden ? '修改品牌文案' : '收起品牌文案';
 
                     if (!isHidden) {
-                        watermarkTextInput.focus();
+                        brandSearchInput.focus();
                     }
                 });
 
-                watermarkTextInput.addEventListener('input', (e) => {
-                    state.watermarkText = e.target.value;
+                brandSearchInput.addEventListener('input', (e) => {
+                    state.brandSearchText = e.target.value;
+                    renderAndPaginate();
+                });
+
+                brandClaimInput.addEventListener('input', (e) => {
+                    state.brandClaimText = e.target.value;
                     renderAndPaginate();
                 });
 
@@ -2068,6 +2267,342 @@ function generatePages(markdown) {
                     }
                 });
 
+                async function waitForPageImages(page) {
+                    const images = Array.from(page.querySelectorAll('img'));
+                    await Promise.all(images.map(image => {
+                        if (image.complete) {
+                            return image.naturalWidth > 0
+                                ? Promise.resolve()
+                                : Promise.reject(new Error(`图片加载失败：${image.src}`));
+                        }
+                        return new Promise((resolve, reject) => {
+                            image.addEventListener('load', resolve, { once: true });
+                            image.addEventListener('error', () => reject(new Error(`图片加载失败：${image.src}`)), { once: true });
+                        });
+                    }));
+                }
+
+                const BRAND_LAYOUT = Object.freeze({
+                    horizontalInset: 18,
+                    iconSize: 18,
+                    iconGap: 7,
+                    primaryFontSize: 15,
+                    primaryMinFontSize: 12,
+                    primaryLineHeight: 20,
+                    secondaryFontSize: 11.5,
+                    secondaryMinFontSize: 9.5,
+                    secondaryLineHeight: 15,
+                    rowGap: 2
+                });
+
+                const BRAND_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+                let wechatIconImagePromise;
+
+                function loadImageFromBlob(blob) {
+                    return new Promise((resolve, reject) => {
+                        const objectUrl = URL.createObjectURL(blob);
+                        const image = new Image();
+
+                        image.onload = () => {
+                            URL.revokeObjectURL(objectUrl);
+                            resolve(image);
+                        };
+                        image.onerror = () => {
+                            URL.revokeObjectURL(objectUrl);
+                            reject(new Error('无法解码导出图层'));
+                        };
+                        image.src = objectUrl;
+                    });
+                }
+
+                function loadWechatIconImage() {
+                    if (!wechatIconImagePromise) {
+                        const paths = WECHAT_ICON_PATHS
+                            .map(pathData => `<path d="${pathData}"/>`)
+                            .join('');
+                        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#07C160">${paths}</svg>`;
+                        wechatIconImagePromise = loadImageFromBlob(new Blob([svg], { type: 'image/svg+xml' }));
+                    }
+
+                    return wechatIconImagePromise;
+                }
+
+                function createExportContentClone(page, currentTheme, layout) {
+                    const source = page.querySelector('.preview-page-content');
+                    if (!source) throw new Error('找不到待导出的正文区域');
+
+                    const stage = document.createElement('div');
+                    Object.assign(stage.style, {
+                        position: 'fixed',
+                        top: '0',
+                        left: '-10000px',
+                        width: `${CANVAS_CONFIG.pageWidth}px`,
+                        height: `${layout.contentHeight}px`,
+                        overflow: 'hidden',
+                        pointerEvents: 'none',
+                        zIndex: '-2147483647',
+                        backgroundColor: currentTheme.background
+                    });
+
+                    const clone = source.cloneNode(true);
+                    Object.assign(clone.style, {
+                        boxSizing: 'border-box',
+                        width: `${CANVAS_CONFIG.pageWidth}px`,
+                        height: `${layout.contentHeight}px`,
+                        minHeight: '0',
+                        maxHeight: `${layout.contentHeight}px`,
+                        margin: '0',
+                        overflow: 'hidden',
+                        boxShadow: 'none',
+                        transform: 'none',
+                        transition: 'none',
+                        animation: 'none',
+                        backgroundColor: currentTheme.background,
+                        color: currentTheme.text
+                    });
+
+                    clone.querySelectorAll('*').forEach(element => {
+                        element.style.transition = 'none';
+                        element.style.animation = 'none';
+                    });
+                    clone.querySelectorAll('tbody tr').forEach((row, index) => {
+                        row.style.backgroundColor = index % 2 === 0
+                            ? currentTheme.background
+                            : currentTheme.tableStripe;
+                    });
+
+                    stage.appendChild(clone);
+                    document.body.appendChild(stage);
+                    return { stage, clone };
+                }
+
+                async function renderWithHtml2Canvas(clone, currentTheme, layout) {
+                    return html2canvas(clone, {
+                        scale: CANVAS_CONFIG.exportScale,
+                        width: CANVAS_CONFIG.pageWidth,
+                        height: layout.contentHeight,
+                        scrollX: 0,
+                        scrollY: 0,
+                        useCORS: true,
+                        allowTaint: false,
+                        logging: false,
+                        backgroundColor: currentTheme.background
+                    });
+                }
+
+                async function renderWithDomToImage(clone, currentTheme, layout) {
+                    const outputHeight = layout.contentHeight * CANVAS_CONFIG.exportScale;
+                    const blob = await domtoimage.toBlob(clone, {
+                        width: CANVAS_CONFIG.exportWidth,
+                        height: outputHeight,
+                        bgcolor: currentTheme.background,
+                        style: {
+                            transform: `scale(${CANVAS_CONFIG.exportScale})`,
+                            transformOrigin: 'top left',
+                            width: `${CANVAS_CONFIG.pageWidth}px`,
+                            height: `${layout.contentHeight}px`,
+                            maxHeight: `${layout.contentHeight}px`,
+                            margin: '0',
+                            boxShadow: 'none',
+                            backgroundColor: currentTheme.background
+                        },
+                        quality: 1,
+                        cacheBust: true
+                    });
+
+                    const image = await loadImageFromBlob(blob);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = CANVAS_CONFIG.exportWidth;
+                    canvas.height = outputHeight;
+                    const context = canvas.getContext('2d');
+                    context.fillStyle = currentTheme.background;
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+                    return canvas;
+                }
+
+                async function renderPageContent(page, currentTheme, layout, rendererMode = 'auto') {
+                    const { stage, clone } = createExportContentClone(page, currentTheme, layout);
+
+                    try {
+                        await waitForActiveFonts();
+                        await waitForPageImages(clone);
+
+                        if (rendererMode === 'dom-to-image') {
+                            return await renderWithDomToImage(clone, currentTheme, layout);
+                        }
+
+                        if (rendererMode === 'html2canvas') {
+                            return await renderWithHtml2Canvas(clone, currentTheme, layout);
+                        }
+
+                        try {
+                            return await renderWithHtml2Canvas(clone, currentTheme, layout);
+                        } catch (error) {
+                            console.warn('html2canvas 正文图层生成失败，切换到 dom-to-image', error);
+                            return await renderWithDomToImage(clone, currentTheme, layout);
+                        }
+                    } finally {
+                        stage.remove();
+                    }
+                }
+
+                function setFittedCanvasFont(context, text, weight, preferredSize, minimumSize, maximumWidth) {
+                    let fontSize = preferredSize * CANVAS_CONFIG.exportScale;
+                    const minimum = minimumSize * CANVAS_CONFIG.exportScale;
+                    const decrement = 0.5 * CANVAS_CONFIG.exportScale;
+
+                    do {
+                        context.font = `${weight} ${fontSize}px ${BRAND_FONT_FAMILY}`;
+                        if (context.measureText(text).width <= maximumWidth || fontSize <= minimum) break;
+                        fontSize = Math.max(minimum, fontSize - decrement);
+                    } while (fontSize > minimum);
+
+                    return fontSize;
+                }
+
+                function drawTextAtVisualCenter(context, text, x, centerY) {
+                    const metrics = context.measureText(text);
+                    const fontSize = Number(context.font.match(/([\d.]+)px/)?.[1]) || 16;
+                    const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.8;
+                    const descent = metrics.actualBoundingBoxDescent || fontSize * 0.2;
+                    context.textBaseline = 'alphabetic';
+                    context.fillText(text, x, centerY + (ascent - descent) / 2);
+                }
+
+                async function drawBrandLockup(context, currentTheme, layout, exportSettings) {
+                    const scale = CANVAS_CONFIG.exportScale;
+                    const brandTop = layout.contentHeight * scale;
+                    const brandHeight = layout.brandHeight * scale;
+                    const borderHeight = 2;
+
+                    context.fillStyle = currentTheme.brandBackground;
+                    context.fillRect(0, brandTop, CANVAS_CONFIG.exportWidth, brandHeight);
+                    context.fillStyle = currentTheme.brandBorder;
+                    context.fillRect(0, brandTop, CANVAS_CONFIG.exportWidth, borderHeight);
+
+                    const primaryLineHeight = BRAND_LAYOUT.primaryLineHeight * scale;
+                    const secondaryLineHeight = BRAND_LAYOUT.secondaryLineHeight * scale;
+                    const rowGap = BRAND_LAYOUT.rowGap * scale;
+                    const lockupHeight = primaryLineHeight + rowGap + secondaryLineHeight;
+                    const lockupTop = brandTop + (brandHeight - lockupHeight) / 2;
+                    const primaryCenterY = lockupTop + primaryLineHeight / 2;
+                    const secondaryCenterY = lockupTop + primaryLineHeight + rowGap + secondaryLineHeight / 2;
+                    const horizontalInset = BRAND_LAYOUT.horizontalInset * scale;
+                    const iconSize = BRAND_LAYOUT.iconSize * scale;
+                    const iconGap = BRAND_LAYOUT.iconGap * scale;
+                    const primaryMaximumWidth = CANVAS_CONFIG.exportWidth - horizontalInset * 2 - iconSize - iconGap;
+
+                    setFittedCanvasFont(
+                        context,
+                        exportSettings.brandSearchText,
+                        700,
+                        BRAND_LAYOUT.primaryFontSize,
+                        BRAND_LAYOUT.primaryMinFontSize,
+                        primaryMaximumWidth
+                    );
+                    const primaryTextWidth = context.measureText(exportSettings.brandSearchText).width;
+                    const primaryGroupWidth = iconSize + iconGap + primaryTextWidth;
+                    const primaryStartX = (CANVAS_CONFIG.exportWidth - primaryGroupWidth) / 2;
+                    const icon = await loadWechatIconImage();
+                    context.drawImage(icon, primaryStartX, primaryCenterY - iconSize / 2, iconSize, iconSize);
+
+                    context.fillStyle = currentTheme.brandPrimary;
+                    context.textAlign = 'left';
+                    drawTextAtVisualCenter(
+                        context,
+                        exportSettings.brandSearchText,
+                        primaryStartX + iconSize + iconGap,
+                        primaryCenterY
+                    );
+
+                    const secondaryMaximumWidth = CANVAS_CONFIG.exportWidth - horizontalInset * 2;
+                    setFittedCanvasFont(
+                        context,
+                        exportSettings.brandClaimText,
+                        600,
+                        BRAND_LAYOUT.secondaryFontSize,
+                        BRAND_LAYOUT.secondaryMinFontSize,
+                        secondaryMaximumWidth
+                    );
+                    const secondaryTextWidth = context.measureText(exportSettings.brandClaimText).width;
+                    context.fillStyle = currentTheme.brandSecondary;
+                    drawTextAtVisualCenter(
+                        context,
+                        exportSettings.brandClaimText,
+                        (CANVAS_CONFIG.exportWidth - secondaryTextWidth) / 2,
+                        secondaryCenterY
+                    );
+                }
+
+                async function composePageCanvas(contentCanvas, exportSettings) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = CANVAS_CONFIG.exportWidth;
+                    canvas.height = CANVAS_CONFIG.exportHeight;
+                    const context = canvas.getContext('2d');
+                    const { currentTheme, layout, showBrand } = exportSettings;
+                    const scale = CANVAS_CONFIG.exportScale;
+                    const contentY = showBrand ? 0 : layout.safeOffset * scale;
+
+                    context.fillStyle = currentTheme.background;
+                    context.fillRect(0, 0, canvas.width, canvas.height);
+                    context.drawImage(
+                        contentCanvas,
+                        0,
+                        contentY,
+                        CANVAS_CONFIG.exportWidth,
+                        layout.contentHeight * scale
+                    );
+
+                    if (showBrand) {
+                        await drawBrandLockup(context, currentTheme, layout, exportSettings);
+                    }
+
+                    return canvas;
+                }
+
+                function canvasToPngBlob(canvas) {
+                    return new Promise((resolve, reject) => {
+                        canvas.toBlob(blob => {
+                            if (blob) resolve(blob);
+                            else reject(new Error('PNG 生成失败'));
+                        }, 'image/png', 1);
+                    });
+                }
+
+                async function assertPngDimensions(blob) {
+                    if (!blob) throw new Error('PNG 生成失败');
+
+                    const objectUrl = URL.createObjectURL(blob);
+                    try {
+                        const dimensions = await new Promise((resolve, reject) => {
+                            const image = new Image();
+                            image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+                            image.onerror = () => reject(new Error('无法读取导出图片尺寸'));
+                            image.src = objectUrl;
+                        });
+
+                        if (dimensions.width !== CANVAS_CONFIG.exportWidth || dimensions.height !== CANVAS_CONFIG.exportHeight) {
+                            throw new Error(`导出尺寸错误：${dimensions.width}×${dimensions.height}`);
+                        }
+                    } finally {
+                        URL.revokeObjectURL(objectUrl);
+                    }
+                }
+
+                async function exportPageToBlob(page, exportSettings) {
+                    const contentCanvas = await renderPageContent(
+                        page,
+                        exportSettings.currentTheme,
+                        exportSettings.layout,
+                        exportSettings.rendererMode
+                    );
+                    const pageCanvas = await composePageCanvas(contentCanvas, exportSettings);
+                    const blob = await canvasToPngBlob(pageCanvas);
+                    await assertPngDimensions(blob);
+                    return blob;
+                }
+
                 // --- EXPORT LOGIC ---
                 exportBtn.addEventListener('click', async () => {
                     loadingIndicator.classList.remove('hidden');
@@ -2076,61 +2611,37 @@ function generatePages(markdown) {
 
                     try {
                         const zip = new JSZip();
-                        const pages = previewArea.querySelectorAll('.preview-page');
+                        const pages = Array.from(previewArea.querySelectorAll('.preview-page'));
+                        const requestedRenderer = new URLSearchParams(window.location.search).get('exportRenderer');
+                        const exportSettings = Object.freeze({
+                            currentTheme: themes[state.theme] || themes.sunshine,
+                            layout: getActiveLayout(),
+                            showBrand: state.showBrand,
+                            brandSearchText: state.brandSearchText,
+                            brandClaimText: state.brandClaimText,
+                            rendererMode: ['html2canvas', 'dom-to-image'].includes(requestedRenderer)
+                                ? requestedRenderer
+                                : 'auto'
+                        });
                         await waitForActiveFonts();
+                        if (exportSettings.showBrand) await loadWechatIconImage();
 
                         for (let i = 0; i < pages.length; i++) {
                             const page = pages[i];
-                            try {
-                                console.log(`Exporting page ${i + 1} using html2canvas with active fonts`);
-
-                                const canvas = await html2canvas(page, {
-                                    scale: 5,
-                                    useCORS: true,
-                                    allowTaint: true,
-                                    logging: false,
-                                    backgroundColor: window.getComputedStyle(page).backgroundColor
-                                });
-                                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
-
-                                console.log(`Page ${i + 1} exported successfully, size: ${(blob.size / 1024).toFixed(2)} KB`);
-
-                                zip.file(`page-${String(i + 1).padStart(2, '0')}.png`, blob);
-                            } catch (error) {
-                                console.error('Error generating image for page', i, error);
-                                // 如果 html2canvas 失败，尝试回退到 dom-to-image
-                                try {
-                                    console.log(`Falling back to dom-to-image for page ${i + 1}`);
-                                    const pageWidth = page.offsetWidth;
-                                    const pageHeight = page.offsetHeight;
-                                    const scale = 5;
-                                    const blob = await domtoimage.toBlob(page, {
-                                        width: pageWidth * scale,
-                                        height: pageHeight * scale,
-                                        style: {
-                                            transform: `scale(${scale})`,
-                                            transformOrigin: 'top left',
-                                            width: pageWidth + 'px',
-                                            height: pageHeight + 'px'
-                                        },
-                                        quality: 1.0,
-                                        cacheBust: true
-                                    });
-                                    console.log(`Page ${i + 1} fallback export, size: ${(blob.size / 1024).toFixed(2)} KB`);
-                                    zip.file(`page-${String(i + 1).padStart(2, '0')}.png`, blob);
-                                } catch (fallbackError) {
-                                    console.error('Fallback also failed for page', i, fallbackError);
-                                }
-                            }
+                            const blob = await exportPageToBlob(page, exportSettings);
+                            console.log(`Page ${i + 1} exported successfully, size: ${(blob.size / 1024).toFixed(2)} KB`);
+                            zip.file(`page-${String(i + 1).padStart(2, '0')}.png`, blob);
                         }
 
                         const content = await zip.generateAsync({ type: "blob" });
                         const link = document.createElement('a');
-                        link.href = URL.createObjectURL(content);
+                        const zipUrl = URL.createObjectURL(content);
+                        link.href = zipUrl;
                         link.download = "markdown_pages.zip";
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
+                        setTimeout(() => URL.revokeObjectURL(zipUrl), 0);
                     } catch (error) {
                         console.error('Error in export process', error);
                     } finally {
@@ -2152,9 +2663,11 @@ function generatePages(markdown) {
                 fontSizeSlider.value = state.fontSize;
                 fontSizeValue.textContent = state.fontSize;
 
-                // 设置水印复选框默认值
-                watermarkCheckbox.checked = state.showWatermark;
-                watermarkTextInput.value = state.watermarkText;
+                // 设置版式与品牌区控件默认值
+                layoutPresetSelect.value = state.layoutPreset;
+                brandCheckbox.checked = state.showBrand;
+                brandSearchInput.value = state.brandSearchText;
+                brandClaimInput.value = state.brandClaimText;
 
                 // Initial render
                 renderAndPaginate();
