@@ -115,7 +115,7 @@
             height: 18px;
             display: block;
             flex: 0 0 18px;
-            color: var(--wechat-green);
+            object-fit: contain;
         }
 
         .preview-page-brand-claim {
@@ -489,7 +489,7 @@
                             <button id="toggle-brand-copy-btn" type="button"
                                 class="text-sm font-medium text-orange-600 hover:text-orange-700 transition-colors"
                                 aria-expanded="false" aria-controls="brand-copy-panel">
-                                修改品牌文案
+                                修改品牌内容
                             </button>
                         </div>
                         <div id="brand-copy-panel" class="hidden mt-3 grid gap-3">
@@ -506,6 +506,24 @@
                                 <input id="brand-claim-input" type="text"
                                     class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
                                     autocomplete="off">
+                            </div>
+                            <div>
+                                <div class="mb-2 flex items-center justify-between gap-3">
+                                    <label for="brand-icon-svg-input"
+                                        class="block text-sm font-medium text-gray-700">微信图标 SVG</label>
+                                    <button id="reset-brand-icon-btn" type="button"
+                                        class="text-xs font-medium text-orange-600 hover:text-orange-700 transition-colors">
+                                        恢复默认
+                                    </button>
+                                </div>
+                                <input id="brand-icon-file-input" type="file" accept=".svg,image/svg+xml"
+                                    class="block w-full text-xs text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-orange-50 file:px-3 file:py-2 file:text-xs file:font-medium file:text-orange-700 hover:file:bg-orange-100">
+                                <textarea id="brand-icon-svg-input" rows="5" spellcheck="false"
+                                    class="mt-2 w-full resize-y rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs leading-5 focus:border-transparent focus:ring-2 focus:ring-orange-400"
+                                    placeholder="在这里粘贴完整 SVG 源码"></textarea>
+                                <p class="mt-1.5 text-xs leading-5 text-gray-500">
+                                    仅在当前页面生效；选择文件后会填入源码，预览与 PNG 导出同步更新。
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -634,6 +652,9 @@
                 const brandCopyPanel = document.getElementById('brand-copy-panel');
                 const brandSearchInput = document.getElementById('brand-search-input');
                 const brandClaimInput = document.getElementById('brand-claim-input');
+                const brandIconFileInput = document.getElementById('brand-icon-file-input');
+                const brandIconSvgInput = document.getElementById('brand-icon-svg-input');
+                const resetBrandIconBtn = document.getElementById('reset-brand-icon-btn');
                 const copyHtmlBtn = document.getElementById('copy-html-btn');
                 const copyWechatBtn = document.getElementById('copy-wechat-btn');
                 const exportBtn = document.getElementById('export-zip-btn');
@@ -960,12 +981,9 @@ function generatePages(markdown) {
 
                 const CONTENT_INSET = Object.freeze({ horizontal: 18, vertical: 16 });
 
-        const defaultBrandSearchText = '搜索“口袋分析师”';
+                const defaultBrandSearchText = '搜索“口袋分析师”';
                 const defaultBrandClaimText = '看1万+A/港/美股公司完整报告';
-                const WECHAT_ICON_PATHS = Object.freeze([
-                    'M11.176 14.429c-2.665 0-4.826-1.8-4.826-4.018 0-2.22 2.159-4.02 4.824-4.02S16 8.191 16 10.411c0 1.21-.65 2.301-1.666 3.036a.32.32 0 0 0-.12.366l.218.81a.6.6 0 0 1 .029.117.166.166 0 0 1-.162.162.2.2 0 0 1-.092-.03l-1.057-.61a.5.5 0 0 0-.256-.074.5.5 0 0 0-.142.021 5.7 5.7 0 0 1-1.576.22M9.064 9.542a.647.647 0 1 0 .557-1 .645.645 0 0 0-.646.647.6.6 0 0 0 .09.353Zm3.232.001a.646.646 0 1 0 .546-1 .645.645 0 0 0-.644.644.63.63 0 0 0 .098.356',
-                    'M0 6.826c0 1.455.781 2.765 2.001 3.656a.385.385 0 0 1 .143.439l-.161.6-.1.373a.5.5 0 0 0-.032.14.19.19 0 0 0 .193.193q.06 0 .111-.029l1.268-.733a.6.6 0 0 1 .308-.088q.088 0 .171.025a6.8 6.8 0 0 0 1.625.26 4.5 4.5 0 0 1-.177-1.251c0-2.936 2.785-5.02 5.824-5.02l.15.002C10.587 3.429 8.392 2 5.796 2 2.596 2 0 4.16 0 6.826m4.632-1.555a.77.77 0 1 1-1.54 0 .77.77 0 0 1 1.54 0m3.875 0a.77.77 0 1 1-1.54 0 .77.77 0 0 1 1.54 0'
-                ]);
+                const defaultBrandIconSvg = `<svg t="1788512898749" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="16285" width="200" height="200"><path d="M0 0m409.6 0l204.8 0q409.6 0 409.6 409.6l0 204.8q0 409.6-409.6 409.6l-204.8 0q-409.6 0-409.6-409.6l0-204.8q0-409.6 409.6-409.6Z" fill="#ffffff" opacity=".2" p-id="16286"></path><path d="M488.9088 235.52a253.39904 253.39904 0 0 1 197.98016 411.5456l96.93184 96.93184a28.14976 28.14976 0 0 1-38.28736 41.24672l-1.536-1.42336-96.93184-96.93184A253.3888 253.3888 0 1 1 488.9088 235.52z m0 56.32a197.07904 197.07904 0 1 0 197.07904 197.07904 197.07904 197.07904 0 0 0-197.07904-197.08928z" fill="#ffffff" p-id="16287"></path></svg>`;
 
                 function getActiveLayout() {
                     return LAYOUT_PRESETS[state.layoutPreset] || LAYOUT_PRESETS.standard;
@@ -979,21 +997,16 @@ function generatePages(markdown) {
                     pageContainer.classList.toggle('is-brand-hidden', !state.showBrand);
                 }
 
-                function createWechatIcon() {
-                    const namespace = 'http://www.w3.org/2000/svg';
-                    const icon = document.createElementNS(namespace, 'svg');
-                    icon.classList.add('preview-page-brand-icon');
-                    icon.setAttribute('viewBox', '0 0 16 16');
-                    icon.setAttribute('fill', 'currentColor');
+                function svgToDataUrl(svg) {
+                    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+                }
+
+                function createBrandIcon() {
+                    const icon = document.createElement('img');
+                    icon.className = 'preview-page-brand-icon';
+                    icon.src = svgToDataUrl(state.brandIconSvg);
+                    icon.alt = '';
                     icon.setAttribute('aria-hidden', 'true');
-                    icon.setAttribute('focusable', 'false');
-
-                    WECHAT_ICON_PATHS.forEach(pathData => {
-                        const path = document.createElementNS(namespace, 'path');
-                        path.setAttribute('d', pathData);
-                        icon.appendChild(path);
-                    });
-
                     return icon;
                 }
 
@@ -1008,7 +1021,7 @@ function generatePages(markdown) {
                     const searchLine = document.createElement('p');
                     searchLine.className = 'preview-page-brand-search';
 
-                    const icon = createWechatIcon();
+                    const icon = createBrandIcon();
 
                     const searchText = document.createElement('span');
                     searchText.textContent = state.brandSearchText;
@@ -1036,7 +1049,8 @@ function generatePages(markdown) {
                     layoutPreset: 'standard',
                     showBrand: true,
                     brandSearchText: defaultBrandSearchText,
-                    brandClaimText: defaultBrandClaimText
+                    brandClaimText: defaultBrandClaimText,
+                    brandIconSvg: defaultBrandIconSvg
                 };
 
 
@@ -2212,7 +2226,7 @@ function generatePages(markdown) {
                 toggleBrandCopyBtn.addEventListener('click', () => {
                     const isHidden = brandCopyPanel.classList.toggle('hidden');
                     toggleBrandCopyBtn.setAttribute('aria-expanded', String(!isHidden));
-                    toggleBrandCopyBtn.textContent = isHidden ? '修改品牌文案' : '收起品牌文案';
+                    toggleBrandCopyBtn.textContent = isHidden ? '修改品牌内容' : '收起品牌内容';
 
                     if (!isHidden) {
                         brandSearchInput.focus();
@@ -2226,6 +2240,32 @@ function generatePages(markdown) {
 
                 brandClaimInput.addEventListener('input', (e) => {
                     state.brandClaimText = e.target.value;
+                    renderAndPaginate();
+                });
+
+                brandIconSvgInput.addEventListener('input', (e) => {
+                    state.brandIconSvg = e.target.value;
+                    renderAndPaginate();
+                });
+
+                brandIconFileInput.addEventListener('change', (e) => {
+                    const [file] = e.target.files;
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const svg = String(reader.result || '');
+                        brandIconSvgInput.value = svg;
+                        state.brandIconSvg = svg;
+                        renderAndPaginate();
+                    };
+                    reader.readAsText(file);
+                });
+
+                resetBrandIconBtn.addEventListener('click', () => {
+                    brandIconFileInput.value = '';
+                    brandIconSvgInput.value = defaultBrandIconSvg;
+                    state.brandIconSvg = defaultBrandIconSvg;
                     renderAndPaginate();
                 });
 
@@ -2296,7 +2336,7 @@ function generatePages(markdown) {
                 });
 
                 const BRAND_FONT_FAMILY = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-                let wechatIconImagePromise;
+                let brandIconImageCache = { svg: '', promise: null };
 
                 function loadImageFromBlob(blob) {
                     return new Promise((resolve, reject) => {
@@ -2315,16 +2355,15 @@ function generatePages(markdown) {
                     });
                 }
 
-                function loadWechatIconImage() {
-                    if (!wechatIconImagePromise) {
-                        const paths = WECHAT_ICON_PATHS
-                            .map(pathData => `<path d="${pathData}"/>`)
-                            .join('');
-                        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="#07C160">${paths}</svg>`;
-                        wechatIconImagePromise = loadImageFromBlob(new Blob([svg], { type: 'image/svg+xml' }));
+                function loadBrandIconImage(svg) {
+                    if (brandIconImageCache.svg !== svg || !brandIconImageCache.promise) {
+                        brandIconImageCache = {
+                            svg,
+                            promise: loadImageFromBlob(new Blob([svg], { type: 'image/svg+xml' }))
+                        };
                     }
 
-                    return wechatIconImagePromise;
+                    return brandIconImageCache.promise;
                 }
 
                 function createExportContentClone(page, currentTheme, layout) {
@@ -2504,7 +2543,7 @@ function generatePages(markdown) {
                     const primaryTextWidth = context.measureText(exportSettings.brandSearchText).width;
                     const primaryGroupWidth = iconSize + iconGap + primaryTextWidth;
                     const primaryStartX = (CANVAS_CONFIG.exportWidth - primaryGroupWidth) / 2;
-                    const icon = await loadWechatIconImage();
+                    const icon = await loadBrandIconImage(exportSettings.brandIconSvg);
                     context.drawImage(icon, primaryStartX, primaryCenterY - iconSize / 2, iconSize, iconSize);
 
                     context.fillStyle = currentTheme.brandPrimary;
@@ -2619,12 +2658,13 @@ function generatePages(markdown) {
                             showBrand: state.showBrand,
                             brandSearchText: state.brandSearchText,
                             brandClaimText: state.brandClaimText,
+                            brandIconSvg: state.brandIconSvg,
                             rendererMode: ['html2canvas', 'dom-to-image'].includes(requestedRenderer)
                                 ? requestedRenderer
                                 : 'auto'
                         });
                         await waitForActiveFonts();
-                        if (exportSettings.showBrand) await loadWechatIconImage();
+                        if (exportSettings.showBrand) await loadBrandIconImage(exportSettings.brandIconSvg);
 
                         for (let i = 0; i < pages.length; i++) {
                             const page = pages[i];
@@ -2668,6 +2708,7 @@ function generatePages(markdown) {
                 brandCheckbox.checked = state.showBrand;
                 brandSearchInput.value = state.brandSearchText;
                 brandClaimInput.value = state.brandClaimText;
+                brandIconSvgInput.value = state.brandIconSvg;
 
                 // Initial render
                 renderAndPaginate();
